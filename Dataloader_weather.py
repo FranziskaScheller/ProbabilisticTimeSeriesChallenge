@@ -78,7 +78,8 @@ def DataUpdaterWeather(update_only_R_data):
         df = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_R_data.csv')
 
         first_date = datetime.strptime(max(df['init_tm'].values), '%Y-%m-%d') + timedelta(days = 1)
-        last_date = datetime.strptime(datetime.strftime(datetime.now(), '%Y-%m-%d'), '%Y-%m-%d') - timedelta(days = 1)
+        last_date = datetime.strptime(datetime.strftime(datetime.now(), '%Y-%m-%d'), '%Y-%m-%d')
+        #last_date = datetime.strptime(datetime.strftime(datetime.now(), '%Y-%m-%d'), '%Y-%m-%d') - timedelta(days = 1)
 
         new_weather_forecasts = DataPreparer(datetime.strftime(first_date, '%Y-%m-%d'), datetime.strftime(last_date, '%Y-%m-%d'))
 
@@ -133,18 +134,39 @@ def RealObservationsAdder(file_path_data_full, file_path_for_update, variable_in
     data_full = pd.read_csv(file_path_data_full)
     data_full_merge = data_full
 
+    data_full_merge['init_tm_dt'] = data_full_merge['init_tm'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d'))
+    data_full_merge['MESS_DATUM'] = data_full_merge['init_tm_dt'] + pd.to_timedelta(data_full_merge['fcst_hour'], 'h')
+    data_full_merge = data_full_merge.drop(columns=['init_tm_dt'])
 
     if variable_indicator == 't_2m':
         temperature = real_obs[['MESS_DATUM', 'TT_TU']]
         temperature['met_var'] = 't_2m'
         #data_full[(data_full['met_var'] == 't_2m') & (np.isnan(data_full['obs']) == True)]['obs'] =
 
-        data_full_merge['init_tm_dt'] = data_full_merge['init_tm'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d'))
-        data_full_merge['MESS_DATUM'] = data_full_merge['init_tm_dt'] + pd.to_timedelta(data_full_merge['fcst_hour'],'h')
-        data_full_merge = data_full_merge.drop(columns = ['init_tm_dt'])
         data_full_merge = data_full_merge.merge(temperature, on = ['met_var', 'MESS_DATUM'], how = 'outer')
         data_full_merge['obs'] = data_full_merge['obs'].fillna(data_full_merge['TT_TU'])
         data_full_merge = data_full_merge.drop(columns=['TT_TU'])
-        data_full_merge.to_csv(file_path_data_full.replace('.csv','') + '_updated_real_obs.csv', index=False)
+        data_full_merge.to_csv(file_path_data_full.replace('.csv','') + '_updated_real_obs_temp.csv', index=False)
+
+    elif variable_indicator == 'wind_10m':
+        wind = real_obs[['MESS_DATUM', 'F']]
+        wind['F'] = wind['F'] * 3.6
+        wind['met_var'] = 'wind_10m'
+        data_full_merge = data_full_merge.merge(wind, on = ['met_var', 'MESS_DATUM'], how = 'outer')
+        data_full_merge['obs'] = data_full_merge['obs'].fillna(data_full_merge['F'])
+        data_full_merge = data_full_merge.drop(columns=['F'])
+        data_full_merge.to_csv(file_path_data_full.replace('.csv','') + '_updated_real_obs_wind.csv', index=False)
 
     return data_full_merge
+
+file_path_data_full = '/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv'
+full_weather_data = RealObservationsAdder(
+    file_path_data_full,
+    '/Users/franziska/Dropbox/DataPTSFC/produkt_tu_stunde_20200423_20211020_04177.txt', 't_2m')
+
+
+file_path_data_full = '/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv'
+RealObservationsAdder(file_path_data_full, '/Users/franziska/Dropbox/DataPTSFC/produkt_ff_stunde_20200423_20211020_04177.txt', 'wind_10m')
+
+
+print(1)

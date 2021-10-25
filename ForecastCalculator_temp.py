@@ -41,13 +41,13 @@ xfun = importr('xfun')
 scoringRules = rpackages.importr('scoringRules')
 crch = rpackages.importr('crch')
 """ load weather data """
-DataUpdaterWeather(update_only_R_data=True)
+#DataUpdaterWeather(update_only_R_data=True)
 DataUpdaterWeather(update_only_R_data=False)
-
+file_path_data_full = '/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv'
 # full_weather_data = pd.read_csv('/Users/franziska/PycharmProjects/PTSFC/data/weather/icon_eps_weather_full.csv')
 full_weather_data = RealObservationsAdder(
-    '/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv',
-    '/Users/franziska/Dropbox/DataPTSFC/produkt_tu_stunde_20200421_20211020_04177.txt', 't_2m')
+    file_path_data_full,
+    '/Users/franziska/Dropbox/DataPTSFC/produkt_tu_stunde_20200423_20211020_04177.txt', 't_2m')
 
 df_aswdir_s, df_clct, df_mslp, df_t_2m, df_t_850hPa, df_vmax_10m, df_wind_10m = DataLoaderWeather(full_weather_data)
 
@@ -148,5 +148,9 @@ for i in horizon:
 
 
 # plot histogram of ensemble forecasts
+
+
+# ----- Wind Forecasts
+RealObservationsAdder(file_path_data_full, '/Users/franziska/Dropbox/DataPTSFC/produkt_ff_stunde_20200423_20211020_04177.txt', 'wind_10m')
 
 print(12)
