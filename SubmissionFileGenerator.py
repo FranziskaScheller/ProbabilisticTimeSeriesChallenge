@@ -22,8 +22,7 @@ def SubmissionFileGenerator(submission_date, forecasts_DAX, forecasts_temp, fore
     data.iloc[0:5, 3:] = forecasts_DAX
     data.iloc[5:10, 3:] = forecasts_temp
     data.iloc[10:15, 3:] = forecasts_wind
-
-    data.to_csv('/Users/franziska/PycharmProjects/PTSFC/Submissions/' + submission_date.replace('-','') + '_ChandlerBing.csv', index = False)
+    data.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions' + submission_date.replace('-','') + '_ChandlerBing.csv', index = False)
     return
 
 submission_date = '2021-10-20'

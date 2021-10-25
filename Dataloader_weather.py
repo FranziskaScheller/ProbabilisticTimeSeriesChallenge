@@ -6,7 +6,7 @@ from rpy2.robjects.packages import importr
 import rpy2.robjects.packages as rpackages
 import pandas as pd
 import numpy as np
-from DataPrepairer_weather import DataPreparer
+from DataPreparer_weather import DataPreparer
 from datetime import datetime, timedelta
 import dwdweather
 from dwdweather import DwdWeather
@@ -42,7 +42,7 @@ def DataLoaderHistWeather():
     data = []
     numeric_cols = ENS_COLS + ["obs"]
     for wv in WEATHER_VARS:
-        icon_eps = robjects.r["load"]("./data/weather/icon_eps_data/icon_eps_" + wv + ".RData")
+        icon_eps = robjects.r["load"]("./Data/Weather/icon_eps_data/icon_eps_" + wv + ".RData")
         with localconverter(robjects.default_converter + pandas2ri.converter):
             r_df = robjects.r['data_icon_eps']
             df = robjects.conversion.rpy2py(r_df)
@@ -58,7 +58,7 @@ def DataLoaderHistWeather():
 
     df = pd.concat(data, join='inner')
 
-    df.to_csv('/Users/franziska/PycharmProjects/PTSFC/data/weather/icon_eps_weather_R_data.csv', index = False)
+    df.to_csv('/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_R_data.csv', index = False)
 
     return
 
@@ -75,7 +75,7 @@ def DataUpdaterWeather(update_only_R_data):
     """
     if update_only_R_data == True:
         DataLoaderHistWeather()
-        df = pd.read_csv('/Users/franziska/PycharmProjects/PTSFC/data/weather/icon_eps_weather_R_data.csv')
+        df = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_R_data.csv')
 
         first_date = datetime.strptime(max(df['init_tm'].values), '%Y-%m-%d') + timedelta(days = 1)
         last_date = datetime.strptime(datetime.strftime(datetime.now(), '%Y-%m-%d'), '%Y-%m-%d') - timedelta(days = 1)
@@ -83,12 +83,12 @@ def DataUpdaterWeather(update_only_R_data):
         new_weather_forecasts = DataPreparer(datetime.strftime(first_date, '%Y-%m-%d'), datetime.strftime(last_date, '%Y-%m-%d'))
 
         data_full = df.append(new_weather_forecasts)
-        data_full.to_csv('/Users/franziska/PycharmProjects/PTSFC/data/weather/icon_eps_weather_R_data_updated.csv', index = False)
-        data_full.to_csv('/Users/franziska/PycharmProjects/PTSFC/data/weather/icon_eps_weather_full.csv',
+        data_full.to_csv('/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_R_data_updated.csv', index = False)
+        data_full.to_csv('/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv',
                      index=False)
 
     else:
-        data_newest_version = pd.read_csv('/Users/franziska/PycharmProjects/PTSFC/data/weather/icon_eps_weather_full.csv')
+        data_newest_version = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv')
 
         first_date = datetime.strptime(max(data_newest_version['init_tm'].values), '%Y-%m-%d') + timedelta(days = 1)
         last_date = datetime.strptime(datetime.strftime(datetime.now(), '%Y-%m-%d'), '%Y-%m-%d') - timedelta(days = 1)
@@ -103,7 +103,7 @@ def DataUpdaterWeather(update_only_R_data):
             # new_weather_data = pd.read_csv(file_path)
 
             data_full = data_newest_version.append(new_weather_forecasts)
-            data_full.to_csv('/Users/franziska/PycharmProjects/PTSFC/data/weather/icon_eps_weather_full.csv', index = False)
+            data_full.to_csv('/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv', index = False)
 
     return
 

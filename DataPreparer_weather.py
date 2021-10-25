@@ -12,7 +12,7 @@ def DataPreparer(first_date, last_date):
     for var_name in list_variable_names:
         for date in all_dates:
             if ((var_name != "t_850hPa") & (date != datetime.strptime('2021-10-02', '%Y-%m-%d'))):
-                file_name = '/Users/franziska/PycharmProjects/PTSFC/kit-weather-ensemble-point-forecast-karlsruhe/icon-eu-eps_' + str(date.strftime("%Y%m%d%H")) + '_' + var_name + '_Karlsruhe.txt'
+                file_name = '/Users/franziska/PycharmProjects/ProbabilisticTimeSeriesChallenge/kit-weather-ensemble-point-forecast-karlsruhe/icon-eu-eps_' + str(date.strftime("%Y%m%d%H")) + '_' + var_name + '_Karlsruhe.txt'
                 data = pd.read_csv(file_name, sep=",", header=None)
                 data = data[4:]
                 data = data[0].str.split('|', 42, expand=True)
@@ -51,7 +51,7 @@ def DataPreparer(first_date, last_date):
 
     data_full['met_var'] = data_full['met_var'].replace('wind_mean_10m', 'wind_10m')
 
-    file_path = '/Users/franziska/PycharmProjects/PTSFC/data/weather/weather_data_summary' + first_date + last_date
+    file_path = '/Users/franziska/Dropbox/DataPTSFC/weather_data_summary' + first_date + last_date
 
     data_full.to_csv(file_path, index = False)
 
