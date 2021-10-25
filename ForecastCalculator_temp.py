@@ -1,0 +1,149 @@
+import rpy2
+import rpy2.robjects as robjects
+import rpy2.robjects.pandas2ri as pandas2ri
+from rpy2.robjects.conversion import localconverter
+from rpy2.robjects.packages import importr
+import rpy2.robjects.packages as rpackages
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import logging
+from rpy2.robjects import pandas2ri
+
+from rpy2.robjects.conversion import localconverter
+
+from Dataloader_weather import DataUpdaterWeather,DataLoaderWeather,RealObservationsAdder
+
+from sklearn.model_selection import KFold
+import scipy
+import sklearn
+import cython
+#fromskgardenimportMondrianForestRegressor
+
+"""
+Inthefollowingwefirstsetuptherpy2frameworkinordertobeabletouseRpackagesafterwards
+"""
+base=importr('base')
+utils=rpackages.importr('utils')
+utils.chooseCRANmirror(ind=1)
+
+#Rpackagenameswhicharerequiredinthefollowingandthereforenowinstalledfirst
+packnames=('ggplot2','hexbin','scoringRules','rdwd')
+from rpy2.robjects.vectors import StrVector
+names_to_install = [x for x in packnames if not rpackages.isinstalled(x)]
+if len(names_to_install)>0:
+    utils.install_packages(StrVector(names_to_install))
+
+#install.packages("xfun")
+xfun=importr('xfun')
+scoringRules=rpackages.importr('scoringRules')
+crch=rpackages.importr('crch')
+"""loadweatherdata"""
+#DataUpdaterWeather(update_only_R_data=True)
+#DataUpdaterWeather(update_only_R_data=False)
+
+#full_weather_data=pd.read_csv('/Users/franziska/PycharmProjects/PTSFC/data/weather/icon_eps_weather_full.csv')
+full_weather_data=RealObservationsAdder('/Users/franziska/PycharmProjects/PTSFC/data/weather/icon_eps_weather_full.csv','/Users/franziska/PycharmProjects/PTSFC/data/weather/produkt_tu_stunde_20200421_20211020_04177.txt','t_2m')
+
+df_aswdir_s,df_clct,df_mslp,df_t_2m,df_t_850hPa,df_vmax_10m,df_wind_10m=DataLoaderWeather(full_weather_data)
+
+"""
+Firstvisualizerealtemperatureobservationstogetafeelingforthedata
+"""
+logging.info('Startingvisualizationoftemperaturedata')
+
+ind=1
+for year in df_t_2m['MESS_DATUM'].dt.year.unique():
+    plt.plot(df_t_2m['MESS_DATUM'][df_t_2m['MESS_DATUM'].dt.year==year],df_t_2m['obs'][df_t_2m['MESS_DATUM'].dt.year==year])
+    plt.xlabel('time')
+    plt.ylabel('temperatureindegreecelcius')
+    ind=ind+1
+    plt.show()
+    plt.savefig(str(year)+'timeseries_raw_data.png')
+
+    df_t_2m['ens_mean']=df_t_2m[["ens_"+str(i) for i in range(1,41)]].mean(axis=1)
+    df_t_2m['ens_var']=df_t_2m[["ens_"+str(i) for i in range(1,41)]].var(axis=1)
+    df_t_2m['ens_sd']=np.sqrt(df_t_2m['ens_var'])
+"""
+ReprogramRexample
+"""
+
+horizon=[36,48,60,72,84]
+estimated_params=pd.DataFrame(horizon,columns=['horizon'])
+estimated_params['mu']=np.zeros(len(estimated_params))
+estimated_params['sd']=np.zeros(len(estimated_params))
+estimated_params['crps']=np.zeros(len(estimated_params))
+
+for i in horizon:
+
+    t2m_data_fcsth_i=df_t_2m[(df_t_2m['fcst_hour']==i)]
+    t2m_data_fcsth_i=t2m_data_fcsth_i.dropna()
+    #t2m_data_fcsth48=t2m_data_fcsth48.set_index(t2m_data_fcsth48['init_tm'])
+    #t2m_data_fcsth_i_train=t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm']<='2020-10-24']
+    #t2m_data_fcsth_i_test=t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm']>'2020-10-24']
+
+    t2m_data_fcsth_i_train=t2m_data_fcsth_i[0:len(t2m_data_fcsth_i)-1]
+    t2m_data_fcsth_i_test=t2m_data_fcsth_i.iloc[-1:]
+
+
+    #t2m_data_fcsth48[(t2m_data_fcsth48.isnull().values)==True]
+    #t2m_data_fcsth48.rolling(7)
+    with localconverter(robjects.default_converter + pandas2ri.converter):
+        t2m_data_fcsth_i_train_r=robjects.conversion.py2rpy(t2m_data_fcsth_i_train)
+        t2m_data_fcsth_i_test_r=robjects.conversion.py2rpy(t2m_data_fcsth_i_test)
+
+    pandas2ri.activate()
+    robjects.globalenv['t2m_data_fcsth_i_train_r']=t2m_data_fcsth_i_train
+    robjects.r('''
+    f<-function(t2m_data_fcsth_i_train){
+    
+    library(crch)
+    train1.crch<-crch(obs~ens_mean|ens_sd,data=t2m_data_fcsth_i_train_r,dist="gaussian",type="crps",link.scale="log")
+    
+    }
+    ''')
+    r_f=robjects.globalenv['f']
+    rf_model=(r_f(t2m_data_fcsth_i_train_r))
+    res=pandas2ri.rpy2py(rf_model)
+    robjects.r('''
+    g<-function(model,test){
+    
+    pred_loc<-as.data.frame(predict(model,test,type="location"))
+    
+    }
+    
+    h<-function(model,test){
+    
+    pred_loc<-as.data.frame(predict(model,test,type="scale"))
+    
+    }
+    ''')
+
+    r_g=robjects.globalenv['g']
+    r_h=robjects.globalenv['h']
+    prediction_mu=(r_g(rf_model,t2m_data_fcsth_i_test_r)).values
+    prediction_sd=(r_h(rf_model,t2m_data_fcsth_i_test_r)).values
+    crps_fun=scoringRules.crps
+    r_float=robjects.vectors.FloatVector
+    y_true_r=r_float(t2m_data_fcsth_i_test['obs'])
+    mu_r=r_float(prediction_mu)
+    sigma_r=r_float(prediction_sd)
+    score=scoringRules.crps(y_true_r,mean=mu_r,sd=sigma_r,family="normal")
+    #mean_crps_score=np.array(score).mean()
+
+    estimated_params['mu'][estimated_params['horizon']==i]=prediction_mu
+    estimated_params['sd'][estimated_params['horizon']==i]=prediction_sd
+    estimated_params['crps'][estimated_params['horizon']==i]=score
+    #withlocalconverter(robjects.default_converter+pandas2ri.converter):
+    #t2m_data_fcsth48_obs_r=robjects.conversion.py2rpy(t2m_data_fcsth48['obs'])
+    #t2m_data_fcsth48_obs_r_2=robjects.vectors.FloatVector(t2m_data_fcsth48['obs'])
+    #t2m_data_fcsth48_ens_r=robjects.conversion.py2rpy(t2m_data_fcsth48[["ens_"+str(i)foriinrange(1,41)]])
+    #t2m_data_fcsth48_ens_r_2=robjects.vectors.FloatVector(t2m_data_fcsth48[["ens_"+str(i)foriinrange(1,41)]].values)
+
+#withlocalconverter(robjects.default_converter+pandas2ri.converter):
+#scoringRules.crps_sample(y=t2m_data_fcsth48_obs_r,dat=t2m_data_fcsth48[["ens_"+str(i)foriinrange(1,41)]])
+
+
+#plothistogramofensembleforecasts
+
+print(12)
