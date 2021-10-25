@@ -10,6 +10,7 @@ from rpy2.robjects import pandas2ri
 from rpy2.robjects.conversion import localconverter
 
 from Dataloader_weather import DataUpdaterWeather, DataLoaderWeather, RealObservationsAdder
+from scipy.stats import norm
 
 """
 In the following we first set up the rpy2 framework in order to be able to use R packages afterwards
@@ -63,7 +64,7 @@ estimated_params = pd.DataFrame(horizon, columns=['horizon'])
 estimated_params['mu'] = np.zeros(len(estimated_params))
 estimated_params['sd'] = np.zeros(len(estimated_params))
 estimated_params['crps'] = np.zeros(len(estimated_params))
-
+estimated_params[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros(len(estimated_params))
 for i in horizon:
     wind_10m_data_fcsth_i = df_wind_10m[(df_wind_10m['fcst_hour'] == i)]
     wind_10m_data_fcsth_i = wind_10m_data_fcsth_i.dropna()
@@ -81,7 +82,7 @@ for i in horizon:
                f <- function(wind_10m_data_fcsth_i_train) {
 
                         library(crch)
-                        train1.crch <- crch(obs ~ ens_mean|ens_sd, data = wind_10m_data_fcsth_i_train_r, dist = "gaussian", type = "crps", link.scale = "log")
+                        train1.crch <- crch(obs ~ ens_mean|ens_sd, data = wind_10m_data_fcsth_i_train_r, dist = "gaussian", left = 0, truncated = TRUE, type = "crps", link.scale = "log")
 
                 }
                 ''')
@@ -117,3 +118,12 @@ for i in horizon:
     estimated_params['mu'][estimated_params['horizon'] == i] = prediction_mu
     estimated_params['sd'][estimated_params['horizon'] == i] = prediction_sd
     estimated_params['crps'][estimated_params['horizon'] == i] = score
+
+    quantile_levels = [0.025,0.25,0.5,0.75,0.975]
+
+    for q in quantile_levels:
+        percentile_q = norm(loc=estimated_params['mu'][estimated_params['horizon'] == i], scale=estimated_params['sd'][estimated_params['horizon'] == i]).ppf(q)
+        estimated_params[str(q)][estimated_params['horizon'] == i] = percentile_q
+    #scipy.stats.norm(loc=prediction_mu, scale=prediction_sd).ppf(0.025)
+
+print(1)

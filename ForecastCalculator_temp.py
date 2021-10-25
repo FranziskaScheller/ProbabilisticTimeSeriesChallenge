@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import logging
 from rpy2.robjects import pandas2ri
+from scipy.stats import norm
 
 from rpy2.robjects.conversion import localconverter
 
@@ -78,6 +79,7 @@ estimated_params = pd.DataFrame(horizon, columns=['horizon'])
 estimated_params['mu'] = np.zeros(len(estimated_params))
 estimated_params['sd'] = np.zeros(len(estimated_params))
 estimated_params['crps'] = np.zeros(len(estimated_params))
+estimated_params[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros(len(estimated_params))
 
 for i in horizon:
     t2m_data_fcsth_i = df_t_2m[(df_t_2m['fcst_hour'] == i)]
@@ -137,6 +139,15 @@ for i in horizon:
     estimated_params['mu'][estimated_params['horizon'] == i] = prediction_mu
     estimated_params['sd'][estimated_params['horizon'] == i] = prediction_sd
     estimated_params['crps'][estimated_params['horizon'] == i] = score
+
+    quantile_levels = [0.025,0.25,0.5,0.75,0.975]
+
+    for q in quantile_levels:
+        percentile_q = norm(loc=estimated_params['mu'][estimated_params['horizon'] == i], scale=estimated_params['sd'][estimated_params['horizon'] == i]).ppf(q)
+        estimated_params[str(q)][estimated_params['horizon'] == i] = percentile_q
+
+    #scipy.stats.norm(loc=prediction_mu, scale=prediction_sd).ppf(0.025)
+
 # with localconverter(robjects.default_converter + pandas2ri.converter):
 #  t2m_data_fcsth48_obs_r = robjects.conversion.py2rpy(t2m_data_fcsth48['obs'])
 #  t2m_data_fcsth48_obs_r_2 = robjects.vectors.FloatVector(t2m_data_fcsth48['obs'])
@@ -148,9 +159,5 @@ for i in horizon:
 
 
 # plot histogram of ensemble forecasts
-
-
-# ----- Wind Forecasts
-RealObservationsAdder(file_path_data_full, '/Users/franziska/Dropbox/DataPTSFC/produkt_ff_stunde_20200423_20211020_04177.txt', 'wind_10m')
 
 print(12)
