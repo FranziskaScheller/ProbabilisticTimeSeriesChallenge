@@ -6,7 +6,7 @@ from rpy2.robjects.packages import importr
 import rpy2.robjects.packages as rpackages
 import pandas as pd
 import numpy as np
-from DataPreparer_weather import DataPreparer
+from DataPrepairer_weather import DataPreparer
 from datetime import datetime, timedelta
 import dwdweather
 from dwdweather import DwdWeather
