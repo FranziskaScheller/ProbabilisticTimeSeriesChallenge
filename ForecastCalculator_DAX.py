@@ -1,10 +1,15 @@
 import pandas as pd
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
+import sklearn
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from arch import arch_model
 
 GDAXI = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/GDAXI/^GDAXI.csv')
+GDAXI = GDAXI.dropna()
 GDAXI['Date']= GDAXI['Date'].apply(lambda x: datetime.strptime(x,'%Y-%m-%d'))
 GDAXI_adj_close = GDAXI[['Date', 'Adj Close']]
 
@@ -55,3 +60,112 @@ for h in range(1,6):
         predictions_quant_reg[str(h)].iloc[i] = pred
         i = i + 1
 
+"""
+Implementation of GARCH model 
+Steps: 
+1. Check trend and seasonality with ACF (Autocorrelation function), PACF (Partial ACF), Plots and Tests 
+"""
+rets = rets.dropna()
+plt.subplot(511)
+plot_acf(rets['ret_1'].values, lags=10)
+plt.title('ACF for 1d returns of DAX')
+plt.show()
+
+f = plt.figure(figsize=(6, 14))
+ax1 = f.add_subplot(511)
+rets['ret_1'].plot(ax=ax1)
+ax1.title.set_text('Time series of 1d returns')
+ax2 = f.add_subplot(512)
+rets['ret_2'].plot(ax=ax2)
+ax2.title.set_text('Time series of 2d returns')
+ax3 = f.add_subplot(513)
+rets['ret_3'].plot(ax=ax3)
+ax3.title.set_text('Time series of 3d returns')
+ax4 = f.add_subplot(514)
+rets['ret_4'].plot(ax=ax4)
+ax4.title.set_text('Time series of 4d returns')
+ax5 = f.add_subplot(515)
+rets['ret_5'].plot(ax=ax5)
+ax5.title.set_text('Time series of 5d returns')
+plt.show()
+plt.savefig('raw_DAX_data_returns_different_fc_horizons.png')
+
+f = plt.figure(figsize=(6, 14))
+ax1 = f.add_subplot(511)
+plot_acf(rets['ret_1'].values, lags=10, ax=ax1)
+ax1.title.set_text('ACF of 1d returns')
+ax2 = f.add_subplot(512)
+plot_acf(rets['ret_2'].values, lags=10, ax=ax2)
+ax2.title.set_text('ACF of 2d returns')
+ax3 = f.add_subplot(513)
+plot_acf(rets['ret_3'].values, lags=10, ax=ax3)
+ax3.title.set_text('ACF of 3d returns')
+ax4 = f.add_subplot(514)
+plot_acf(rets['ret_4'].values, lags=10, ax=ax4)
+ax4.title.set_text('ACF of 4d returns')
+ax5 = f.add_subplot(515)
+plot_acf(rets['ret_5'].values, lags=10, ax=ax5)
+ax5.title.set_text('ACF of 5d returns')
+plt.show()
+plt.savefig('ACF_raw_DAX_data_returns_different_fc_horizons.png')
+
+f = plt.figure(figsize=(6, 14))
+ax1 = f.add_subplot(511)
+plot_pacf(rets['ret_1'].values, lags=10, ax=ax1)
+ax1.title.set_text('PACF of 1d returns')
+ax2 = f.add_subplot(512)
+plot_pacf(rets['ret_2'].values, lags=10, ax=ax2)
+ax2.title.set_text('PACF of 2d returns')
+ax3 = f.add_subplot(513)
+plot_pacf(rets['ret_3'].values, lags=10, ax=ax3)
+ax3.title.set_text('PACF of 3d returns')
+ax4 = f.add_subplot(514)
+plot_pacf(rets['ret_4'].values, lags=10, ax=ax4)
+ax4.title.set_text('PACF of 4d returns')
+ax5 = f.add_subplot(515)
+plot_pacf(rets['ret_5'].values, lags=10, ax=ax5)
+ax5.title.set_text('PACF of 5d returns')
+plt.show()
+plt.savefig('PACF_raw_DAX_data_returns_different_fc_horizons.png')
+
+
+basic_gm = arch_model(rets['ret_1'], p = 1, q = 1,
+                      mean = 'constant', vol = 'GARCH', dist = 'normal')
+# Fit the model
+gm_result = basic_gm.fit()
+gm_forecast = gm_result.forecast(horizon=1)
+forecast_mean = gm_forecast.mean[-1:]
+forecast_var = gm_forecast.variance[-1:]
+#gm_result = basic_gm.fit(update_freq = 4)
+
+
+"""
+Select model based on rolling window performance
+"""
+rets = rets.reset_index(inplace=False)
+n = len(rets)
+start_date_train = rets['Date'][0]
+end_date_train = start_date_train + timedelta(days=365)
+train_init = rets[rets['Date'] <= end_date_train]
+n_train = len(train_init)
+
+col_names = ["mean_fcst_" + str(i) for i in range(1, 6)] + ["var_fcst_" + str(i) for i in range(1, 6)]
+df_forecasts = pd.DataFrame(np.zeros((len(range(0, n-n_train)), 10)), columns=col_names)
+
+for i in range(0, n-n_train):
+    train_dat = rets[(start_date_train <= rets['Date']) & (rets['Date'] <= end_date_train)]
+    for d in range(1, 6):
+        basic_gm = arch_model(train_dat['ret_' + str(d)], p=1, q=1,
+                              mean='constant', vol='GARCH', dist='normal')
+        # Fit the model
+        gm_result = basic_gm.fit()
+        gm_forecast = gm_result.forecast(horizon=1)
+        df_forecasts['mean_fcst_' + str(d)][i] = gm_forecast.mean[-1:]
+        df_forecasts['var_fcst_' + str(d)][i] = gm_forecast.variance[-1:]
+    
+    start_date_train = start_date_train + timedelta(days=1)
+    end_date_train = end_date_train + timedelta(days=1)
+    
+print(1)
+
+#sklearn.metrics.mean_pinball_loss()
