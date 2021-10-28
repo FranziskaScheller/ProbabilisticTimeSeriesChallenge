@@ -43,14 +43,14 @@ scoringRules = rpackages.importr('scoringRules')
 crch = rpackages.importr('crch')
 """ load weather data """
 #DataUpdaterWeather(update_only_R_data=True)
-DataUpdaterWeather(update_only_R_data=False)
+DataUpdaterWeather('2021-10-27')
 file_path_data_full = '/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv'
 # full_weather_data = pd.read_csv('/Users/franziska/PycharmProjects/PTSFC/data/weather/icon_eps_weather_full.csv')
 full_weather_data = RealObservationsAdder(
     file_path_data_full,
-    '/Users/franziska/Dropbox/DataPTSFC/produkt_tu_stunde_20200423_20211020_04177.txt', 't_2m')
+    '/Users/franziska/Dropbox/DataPTSFC/produkt_tu_stunde_20200426_20211027_00433.txt', 't_2m')
 
-df_aswdir_s, df_clct, df_mslp, df_t_2m, df_t_850hPa, df_vmax_10m, df_wind_10m = DataLoaderWeather(full_weather_data)
+df_aswdir_s, df_clct, df_mslp, df_t_2m, df_wind_10m = DataLoaderWeather(full_weather_data)
 
 """
 First visualize real temperature observations to get a feeling for the data

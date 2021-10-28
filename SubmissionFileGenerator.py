@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-
+from datetime import datetime
 
 def SubmissionFileGenerator(submission_date, forecasts_DAX, forecasts_temp, forecasts_wind):
     """
@@ -22,11 +22,17 @@ def SubmissionFileGenerator(submission_date, forecasts_DAX, forecasts_temp, fore
     data.iloc[0:5, 3:] = forecasts_DAX
     data.iloc[5:10, 3:] = forecasts_temp
     data.iloc[10:15, 3:] = forecasts_wind
-    data.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions' + submission_date.replace('-','') + '_ChandlerBing.csv', index = False)
+    # only for omitting temp and wind forecasts
+    data = data.iloc[0:5]
+    data.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/' + submission_date.replace('-','') + '_ChandlerBing.csv', index = False)
     return
 
-submission_date = '2021-10-20'
-forecasts_DAX = pd.DataFrame(np.ones((5,5)))
-forecasts_temp = pd.DataFrame(np.ones((5,5)))
-forecasts_wind = pd.DataFrame(np.ones((5,5)))
+submission_date = datetime.strftime(datetime.now(), '%Y-%m-%d')
+#forecasts_DAX = pd.DataFrame(np.ones((5,5)))
+forecasts_DAX = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/DAX_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'))
+forecasts_DAX = forecasts_DAX.drop(columns = ['quantile'])
+forecasts_DAX = forecasts_DAX.transpose()
+forecasts_temp = pd.DataFrame(np.zeros((5,5)))
+forecasts_wind = pd.DataFrame(np.zeros((5,5)))
 SubmissionFileGenerator(submission_date, forecasts_DAX, forecasts_temp, forecasts_wind)
+print(1)

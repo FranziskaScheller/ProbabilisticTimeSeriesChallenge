@@ -11,6 +11,7 @@ from arch import arch_model
 GDAXI = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/GDAXI/^GDAXI.csv')
 GDAXI = GDAXI.dropna()
 GDAXI['Date']= GDAXI['Date'].apply(lambda x: datetime.strptime(x,'%Y-%m-%d'))
+GDAXI = GDAXI[GDAXI['Date'] >= datetime.strptime('2020-09-27', '%Y-%m-%d')].reset_index(drop=True)
 GDAXI_adj_close = GDAXI[['Date', 'Adj Close']]
 
 def ReturnComputer(y, type, diff_in_periods):
@@ -60,6 +61,7 @@ for h in range(1,6):
         predictions_quant_reg[str(h)].iloc[i] = pred
         i = i + 1
 
+predictions_quant_reg.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/DAX_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
 """
 Implementation of GARCH model 
 Steps: 
@@ -160,8 +162,8 @@ for i in range(0, n-n_train):
         # Fit the model
         gm_result = basic_gm.fit()
         gm_forecast = gm_result.forecast(horizon=1)
-        df_forecasts['mean_fcst_' + str(d)][i] = gm_forecast.mean[-1:]
-        df_forecasts['var_fcst_' + str(d)][i] = gm_forecast.variance[-1:]
+        df_forecasts.iloc[i][['mean_fcst_' + str(d)]] = gm_forecast.mean[-1:]['h.1'].values
+        df_forecasts.iloc[i][['var_fcst_' + str(d)]] = gm_forecast.variance[-1:]['h.1'].values
     
     start_date_train = start_date_train + timedelta(days=1)
     end_date_train = end_date_train + timedelta(days=1)
