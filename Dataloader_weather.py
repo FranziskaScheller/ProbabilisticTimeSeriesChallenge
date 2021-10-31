@@ -130,12 +130,12 @@ def RealObservationsAdder(file_path_data_full, file_path_for_update, variable_in
     return data_full_merge
 
 def DataPreparer(last_wednesday):
-    last_wednesday_dt = datetime.strptime(last_wednesday, '%Y-%m-%d')
+
     list_variable_names = ["aswdir_s","clct", "mslp", "t_2m", "wind_mean_10m"]
     indicator = 0
     for var_name in list_variable_names:
             #if ((var_name != "t_850hPa") & (date != datetime.strptime('2021-10-02', '%Y-%m-%d'))):
-        file_name = '/Users/franziska/PycharmProjects/ProbabilisticTimeSeriesChallenge/kit-weather-ensemble-point-forecast-karlsruhe/icon-eu-eps_' + str(last_wednesday_dt.strftime("%Y%m%d%H")) + '_' + var_name + '_Berlin.txt'
+        file_name = '/Users/franziska/PycharmProjects/ProbabilisticTimeSeriesChallenge/kit-weather-ensemble-point-forecast-berlin/icon-eu-eps_' + str(last_wednesday.strftime("%Y%m%d%H")) + '_' + var_name + '_Berlin.txt'
         data = pd.read_csv(file_name, sep=",", header=None)
         data = data[4:]
         data = data[0].str.split('|', 42, expand=True)
@@ -158,11 +158,12 @@ def DataPreparer(last_wednesday):
         data = data.drop(columns = 'index')
         data['obs_tm'] = np.zeros(shape = (len(data),1)).astype(int)
 
-        for hour in range(0,len(data)):
+        for hour in range(0,len(data)-1):
             data['obs_tm'][hour] = data['init_tm'][hour] + timedelta(hours = int(data['fcst_hour'][hour]))
 
-            data['obs_tm'] = data['obs_tm'].apply(lambda x: x.strftime('%Y-%m-%d'))
-            data['init_tm'] = data['init_tm'].apply(lambda x: x.strftime('%Y-%m-%d'))
+            #data['obs_tm'] = data['obs_tm'].apply(lambda x: x.strftime('%Y-%m-%d'))
+
+        data['init_tm'] = data['init_tm'].apply(lambda x: x.strftime('%Y-%m-%d'))
 
         if indicator == 0:
             data_full = data
@@ -174,20 +175,20 @@ def DataPreparer(last_wednesday):
 
     data_full['met_var'] = data_full['met_var'].replace('wind_mean_10m', 'wind_10m')
 
-    file_path = '/Users/franziska/Dropbox/DataPTSFC/new_weather_data_summary' + last_wednesday
+    file_path = '/Users/franziska/Dropbox/DataPTSFC/new_weather_data_summary' + last_wednesday.strftime('%Y-%m-%d')
 
     data_full.to_csv(file_path, index = False)
 
     return data_full
 
 
-file_path_data_full = '/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv'
-full_weather_data = RealObservationsAdder(
-    file_path_data_full,
-    '/Users/franziska/Dropbox/DataPTSFC/produkt_tu_stunde_20200426_20211027_00433.txt', 't_2m')
+#file_path_data_full = '/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv'
+#full_weather_data = RealObservationsAdder(
+#    file_path_data_full,
+#    '/Users/franziska/Dropbox/DataPTSFC/produkt_tu_stunde_20200426_20211027_00433.txt', 't_2m')
 
-file_path_data_full = '/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv'
-RealObservationsAdder(file_path_data_full, '/Users/franziska/Dropbox/DataPTSFC/produkt_ff_stunde_20200426_20211027_00433.txt', 'wind_10m')
+#file_path_data_full = '/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv'
+#RealObservationsAdder(file_path_data_full, '/Users/franziska/Dropbox/DataPTSFC/produkt_ff_stunde_20200426_20211027_00433.txt', 'wind_10m')
 
 
-print(1)
+#print(1)

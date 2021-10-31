@@ -167,7 +167,13 @@ for i in range(0, n-n_train):
     
     start_date_train = start_date_train + timedelta(days=1)
     end_date_train = end_date_train + timedelta(days=1)
-    
+
+
+"""
+Evaluation of predictions with pinball loss and tests 
+"""
+
+
 print(1)
 
 #sklearn.metrics.mean_pinball_loss()
