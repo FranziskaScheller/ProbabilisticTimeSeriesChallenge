@@ -6,9 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import logging
 from rpy2.robjects import pandas2ri
-
 from rpy2.robjects.conversion import localconverter
-
+from datetime import datetime
 from Dataloader_weather import DataUpdaterWeather, DataLoaderWeather, RealObservationsAdder
 from scipy.stats import norm
 
@@ -32,13 +31,11 @@ xfun = importr('xfun')
 scoringRules = rpackages.importr('scoringRules')
 crch = rpackages.importr('crch')
 """ load wind data """
-#DataUpdaterWeather(update_only_R_data=True)
-DataUpdaterWeather(update_only_R_data=False)
+DataUpdaterWeather('2021-10-27')
 file_path_data_full = '/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv'
-# full_weather_data = pd.read_csv('/Users/franziska/PycharmProjects/PTSFC/data/weather/icon_eps_weather_full.csv')
-full_wind_data = RealObservationsAdder(file_path_data_full, '/Users/franziska/Dropbox/DataPTSFC/produkt_ff_stunde_20200423_20211020_04177.txt', 'wind_10m')
+full_wind_data = RealObservationsAdder(file_path_data_full, '/Users/franziska/Dropbox/DataPTSFC/produkt_ff_stunde_20200501_20211101_00433.txt', 'wind_10m')
 
-df_aswdir_s, df_clct, df_mslp, df_t_2m, df_t_850hPa, df_vmax_10m, df_wind_10m = DataLoaderWeather(full_wind_data)
+df_aswdir_s, df_clct, df_mslp, df_t_2m, df_wind_10m = DataLoaderWeather(full_wind_data)
 
 """
 First visualize real wind observations to get a feeling for the data
@@ -126,4 +123,4 @@ for i in horizon:
         estimated_params[str(q)][estimated_params['horizon'] == i] = percentile_q
     #scipy.stats.norm(loc=prediction_mu, scale=prediction_sd).ppf(0.025)
 
-print(1)
+estimated_params[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/wind_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)

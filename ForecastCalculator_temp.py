@@ -1,7 +1,5 @@
 import rpy2
 import rpy2.robjects as robjects
-import rpy2.robjects.pandas2ri as pandas2ri
-from rpy2.robjects.conversion import localconverter
 from rpy2.robjects.packages import importr
 import rpy2.robjects.packages as rpackages
 import pandas as pd
@@ -10,9 +8,8 @@ import matplotlib.pyplot as plt
 import logging
 from rpy2.robjects import pandas2ri
 from scipy.stats import norm
-
 from rpy2.robjects.conversion import localconverter
-
+from datetime import datetime
 from Dataloader_weather import DataUpdaterWeather, DataLoaderWeather, RealObservationsAdder
 
 from sklearn.model_selection import KFold
@@ -48,10 +45,11 @@ file_path_data_full = '/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.
 # full_weather_data = pd.read_csv('/Users/franziska/PycharmProjects/PTSFC/data/weather/icon_eps_weather_full.csv')
 full_weather_data = RealObservationsAdder(
     file_path_data_full,
-    '/Users/franziska/Dropbox/DataPTSFC/produkt_tu_stunde_20200426_20211027_00433.txt', 't_2m')
+    '/Users/franziska/Dropbox/DataPTSFC/produkt_tu_stunde_20200501_20211101_00433.txt', 't_2m')
 
 df_aswdir_s, df_clct, df_mslp, df_t_2m, df_wind_10m = DataLoaderWeather(full_weather_data)
-
+df_t_2m = df_t_2m.dropna()
+df_wind_10m = df_wind_10m.dropna()
 """
 First visualize real temperature observations to get a feeling for the data
 """
@@ -147,7 +145,7 @@ for i in horizon:
         estimated_params[str(q)][estimated_params['horizon'] == i] = percentile_q
 
     #scipy.stats.norm(loc=prediction_mu, scale=prediction_sd).ppf(0.025)
-
+estimated_params[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/temp_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
 # with localconverter(robjects.default_converter + pandas2ri.converter):
 #  t2m_data_fcsth48_obs_r = robjects.conversion.py2rpy(t2m_data_fcsth48['obs'])
 #  t2m_data_fcsth48_obs_r_2 = robjects.vectors.FloatVector(t2m_data_fcsth48['obs'])
@@ -159,5 +157,3 @@ for i in horizon:
 
 
 # plot histogram of ensemble forecasts
-
-print(12)

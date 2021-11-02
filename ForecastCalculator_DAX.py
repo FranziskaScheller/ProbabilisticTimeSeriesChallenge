@@ -2,7 +2,9 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
-import statsmodels.api as sm
+import rpy2.robjects.packages as rpackages
+import rpy2.robjects as robjects
+from scipy.stats import norm
 import statsmodels.formula.api as smf
 import sklearn
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
@@ -68,7 +70,7 @@ Steps:
 1. Check trend and seasonality with ACF (Autocorrelation function), PACF (Partial ACF), Plots and Tests 
 """
 rets = rets.dropna()
-plt.subplot(511)
+#plt.subplot(511)
 plot_acf(rets['ret_1'].values, lags=10)
 plt.title('ACF for 1d returns of DAX')
 plt.show()
@@ -138,22 +140,22 @@ gm_result = basic_gm.fit()
 gm_forecast = gm_result.forecast(horizon=1)
 forecast_mean = gm_forecast.mean[-1:]
 forecast_var = gm_forecast.variance[-1:]
-#gm_result = basic_gm.fit(update_freq = 4)
-
 
 """
 Select model based on rolling window performance
 """
 rets = rets.reset_index(inplace=False)
+rets = rets.drop(columns = ['index'])
 n = len(rets)
 start_date_train = rets['Date'][0]
 end_date_train = start_date_train + timedelta(days=365)
 train_init = rets[rets['Date'] <= end_date_train]
+test_data = rets[rets['Date'] > end_date_train]
 n_train = len(train_init)
 
-col_names = ["mean_fcst_" + str(i) for i in range(1, 6)] + ["var_fcst_" + str(i) for i in range(1, 6)]
-df_forecasts = pd.DataFrame(np.zeros((len(range(0, n-n_train)), 10)), columns=col_names)
-
+col_names = ["mean_fcst_" + str(i) for i in range(1, 6)] + ["var_fcst_" + str(i) for i in range(1, 6)] + ['crps_' + str(i) for i in range(1,6)]
+df_forecasts = pd.DataFrame(np.zeros((len(range(0, n-n_train)), 15)), columns=col_names)
+df_forecasts['Date'] = rets['Date'][rets['Date'] > end_date_train].values
 for i in range(0, n-n_train):
     train_dat = rets[(start_date_train <= rets['Date']) & (rets['Date'] <= end_date_train)]
     for d in range(1, 6):
@@ -162,12 +164,30 @@ for i in range(0, n-n_train):
         # Fit the model
         gm_result = basic_gm.fit()
         gm_forecast = gm_result.forecast(horizon=1)
-        df_forecasts.iloc[i][['mean_fcst_' + str(d)]] = gm_forecast.mean[-1:]['h.1'].values
-        df_forecasts.iloc[i][['var_fcst_' + str(d)]] = gm_forecast.variance[-1:]['h.1'].values
+        df_forecasts['mean_fcst_' + str(d)].iloc[i] = gm_forecast.mean[-1:]['h.1'].values
+        df_forecasts['var_fcst_' + str(d)].iloc[i] = gm_forecast.variance[-1:]['h.1'].values
     
     start_date_train = start_date_train + timedelta(days=1)
     end_date_train = end_date_train + timedelta(days=1)
 
+# evaluate with crps
+scoringRules = rpackages.importr('scoringRules')
+crps_fun = scoringRules.crps
+r_float = robjects.vectors.FloatVector
+
+for i in range(0, len(df_forecasts)):
+    for j in range(1,6):
+        y_true_r = r_float(test_data[['ret_' + str(j)]].iloc[i])
+        mu_r = r_float(df_forecasts[['mean_fcst_' + str(j)]].iloc[i])
+        sigma_r = r_float(np.sqrt(df_forecasts[['mean_fcst_' + str(j)]].iloc[i]))
+        df_forecasts['crps_' + str(j)].iloc[i] = np.array(scoringRules.crps(y_true_r, mean=mu_r, sd=sigma_r, family="normal"))
+
+
+# for j in range(0, len(df_forecasts)):
+#     for i in range(1, 6):
+#         for q in quantile_levels:
+#             percentile_q = norm(loc=df_forecasts['mean_fcst_' + str(i)].iloc[j], scale=np.sqrt(df_forecasts['var_fcst_' + str(i)].iloc[j])).ppf(q)
+#             df_forecasts[str(q)].iloc[j] = percentile_q
 
 """
 Evaluation of predictions with pinball loss and tests 

@@ -116,15 +116,17 @@ def RealObservationsAdder(file_path_data_full, file_path_for_update, variable_in
         data_full_merge = data_full_merge.merge(temperature, on = ['met_var', 'MESS_DATUM'], how = 'outer')
         data_full_merge['obs'] = data_full_merge['obs'].fillna(data_full_merge['TT_TU'])
         data_full_merge = data_full_merge.drop(columns=['TT_TU'])
+        #data_full_merge = data_full_merge.dropna()
         data_full_merge.to_csv(file_path_data_full.replace('.csv','') + '_updated_real_obs_temp.csv', index=False)
 
     elif variable_indicator == 'wind_10m':
-        wind = real_obs[['MESS_DATUM', 'F']]
-        wind['F'] = wind['F'] * 3.6
+        wind = real_obs[['MESS_DATUM', '   F']]
+        wind['   F'] = wind['   F'] * 3.6
         wind['met_var'] = 'wind_10m'
         data_full_merge = data_full_merge.merge(wind, on = ['met_var', 'MESS_DATUM'], how = 'outer')
-        data_full_merge['obs'] = data_full_merge['obs'].fillna(data_full_merge['F'])
-        data_full_merge = data_full_merge.drop(columns=['F'])
+        data_full_merge['obs'] = data_full_merge['obs'].fillna(data_full_merge['   F'])
+        data_full_merge = data_full_merge.drop(columns=['   F'])
+        #data_full_merge = data_full_merge.dropna()
         data_full_merge.to_csv(file_path_data_full.replace('.csv','') + '_updated_real_obs_wind.csv', index=False)
 
     return data_full_merge
@@ -134,7 +136,6 @@ def DataPreparer(last_wednesday):
     list_variable_names = ["aswdir_s","clct", "mslp", "t_2m", "wind_mean_10m"]
     indicator = 0
     for var_name in list_variable_names:
-            #if ((var_name != "t_850hPa") & (date != datetime.strptime('2021-10-02', '%Y-%m-%d'))):
         file_name = '/Users/franziska/PycharmProjects/ProbabilisticTimeSeriesChallenge/kit-weather-ensemble-point-forecast-berlin/icon-eu-eps_' + str(last_wednesday.strftime("%Y%m%d%H")) + '_' + var_name + '_Berlin.txt'
         data = pd.read_csv(file_name, sep=",", header=None)
         data = data[4:]
@@ -157,11 +158,13 @@ def DataPreparer(last_wednesday):
         data = data.reset_index()
         data = data.drop(columns = 'index')
         data['obs_tm'] = np.zeros(shape = (len(data),1)).astype(int)
+        data['ens_mean'] = np.zeros(shape = (len(data),1)).astype(int)
+        data['ens_var'] = np.zeros(shape = (len(data),1)).astype(int)
 
-        for hour in range(0,len(data)-1):
+        for hour in range(0,len(data)):
             data['obs_tm'][hour] = data['init_tm'][hour] + timedelta(hours = int(data['fcst_hour'][hour]))
-
-            #data['obs_tm'] = data['obs_tm'].apply(lambda x: x.strftime('%Y-%m-%d'))
+            #data['ens_mean'][hour] = data[["ens_" + str(i) for i in range(1, 41)]].iloc[hour].mean()
+            #data['ens_var'][hour] = data[["ens_" + str(i) for i in range(1, 41)]].iloc[hour].var()
 
         data['init_tm'] = data['init_tm'].apply(lambda x: x.strftime('%Y-%m-%d'))
 
@@ -174,6 +177,8 @@ def DataPreparer(last_wednesday):
     #todo: change data type format
 
     data_full['met_var'] = data_full['met_var'].replace('wind_mean_10m', 'wind_10m')
+    data_full['ens_mean'] = data_full[["ens_" + str(i) for i in range(1, 41)]].apply(lambda x: x.mean(), axis=1)
+    data_full['ens_var'] = data_full[["ens_" + str(i) for i in range(1, 41)]].apply(lambda x: x.var(), axis=1)
 
     file_path = '/Users/franziska/Dropbox/DataPTSFC/new_weather_data_summary' + last_wednesday.strftime('%Y-%m-%d')
 
