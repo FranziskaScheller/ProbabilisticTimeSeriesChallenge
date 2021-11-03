@@ -13,7 +13,7 @@ from arch import arch_model
 GDAXI = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/GDAXI/^GDAXI.csv')
 GDAXI = GDAXI.dropna()
 GDAXI['Date']= GDAXI['Date'].apply(lambda x: datetime.strptime(x,'%Y-%m-%d'))
-GDAXI = GDAXI[GDAXI['Date'] >= datetime.strptime('2020-09-27', '%Y-%m-%d')].reset_index(drop=True)
+#GDAXI = GDAXI[GDAXI['Date'] >= datetime.strptime('2019-09-27', '%Y-%m-%d')].reset_index(drop=True)
 GDAXI_adj_close = GDAXI[['Date', 'Adj Close']]
 
 def ReturnComputer(y, type, diff_in_periods):
@@ -63,7 +63,7 @@ for h in range(1,6):
         predictions_quant_reg[str(h)].iloc[i] = pred
         i = i + 1
 
-predictions_quant_reg.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/DAX_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+#predictions_quant_reg.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/DAX_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
 """
 Implementation of GARCH model 
 Steps: 
@@ -140,6 +140,8 @@ gm_result = basic_gm.fit()
 gm_forecast = gm_result.forecast(horizon=1)
 forecast_mean = gm_forecast.mean[-1:]
 forecast_var = gm_forecast.variance[-1:]
+print(1)
+
 
 """
 Select model based on rolling window performance
@@ -148,7 +150,8 @@ rets = rets.reset_index(inplace=False)
 rets = rets.drop(columns = ['index'])
 n = len(rets)
 start_date_train = rets['Date'][0]
-end_date_train = start_date_train + timedelta(days=365)
+end_date_train = rets['Date'][len(rets)-2]
+#end_date_train = start_date_train + timedelta(days=365)
 train_init = rets[rets['Date'] <= end_date_train]
 test_data = rets[rets['Date'] > end_date_train]
 n_train = len(train_init)
@@ -170,6 +173,15 @@ for i in range(0, n-n_train):
     start_date_train = start_date_train + timedelta(days=1)
     end_date_train = end_date_train + timedelta(days=1)
 
+estimated_params = pd.DataFrame(np.zeros((5, 6)), columns=['quantile', '1', '2', '3', '4', '5'])
+estimated_params['quantile'] = [str(i) for i in quantile_levels]
+
+for i in range(1,6):
+    for q in quantile_levels:
+        percentile_q = norm(loc=df_forecasts['mean_fcst_' + str(i)].iloc[0], scale=np.sqrt(df_forecasts['var_fcst_' + str(i)].iloc[0])).ppf(q)
+        estimated_params[str(i)][estimated_params['quantile'] == str(q)] = percentile_q
+
+estimated_params.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/DAX_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
 # evaluate with crps
 scoringRules = rpackages.importr('scoringRules')
 crps_fun = scoringRules.crps
@@ -179,7 +191,7 @@ for i in range(0, len(df_forecasts)):
     for j in range(1,6):
         y_true_r = r_float(test_data[['ret_' + str(j)]].iloc[i])
         mu_r = r_float(df_forecasts[['mean_fcst_' + str(j)]].iloc[i])
-        sigma_r = r_float(np.sqrt(df_forecasts[['mean_fcst_' + str(j)]].iloc[i]))
+        sigma_r = r_float(np.sqrt(df_forecasts[['var_fcst_' + str(j)]].iloc[i]))
         df_forecasts['crps_' + str(j)].iloc[i] = np.array(scoringRules.crps(y_true_r, mean=mu_r, sd=sigma_r, family="normal"))
 
 

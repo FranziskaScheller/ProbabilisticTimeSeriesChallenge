@@ -78,6 +78,8 @@ def DataUpdaterWeather(last_wednesday):
 
     new_weather_forecasts = DataPreparer(last_wednesday)
     data_full = df.append(new_weather_forecasts)
+    data_full['init_tm_dt'] = data_full['init_tm'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d'))
+    data_full['obs_tm_h'] = data_full['init_tm_dt'] + pd.to_timedelta(data_full['fcst_hour'], 'h')
     data_full.to_csv('/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv', index = False)
 
     return data_full

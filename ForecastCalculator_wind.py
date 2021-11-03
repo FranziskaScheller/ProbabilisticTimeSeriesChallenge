@@ -43,9 +43,9 @@ First visualize real wind observations to get a feeling for the data
 logging.info('Starting visualization of wind data')
 
 ind = 1
-for year in df_wind_10m['MESS_DATUM'].dt.year.unique():
-    plt.plot(df_wind_10m['MESS_DATUM'][df_wind_10m['MESS_DATUM'].dt.year == year],
-             df_wind_10m['obs'][df_wind_10m['MESS_DATUM'].dt.year == year])
+for year in df_wind_10m['obs_tm_h'].dt.year.unique():
+    plt.plot(df_wind_10m['obs_tm_h'][df_wind_10m['obs_tm_h'].dt.year == year],
+             df_wind_10m['obs'][df_wind_10m['obs_tm_h'].dt.year == year])
     plt.xlabel('time')
     plt.ylabel('wind in km/h')
     ind = ind + 1
@@ -64,10 +64,9 @@ estimated_params['crps'] = np.zeros(len(estimated_params))
 estimated_params[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros(len(estimated_params))
 for i in horizon:
     wind_10m_data_fcsth_i = df_wind_10m[(df_wind_10m['fcst_hour'] == i)]
-    wind_10m_data_fcsth_i = wind_10m_data_fcsth_i.dropna()
 
-    wind_10m_data_fcsth_i_train = wind_10m_data_fcsth_i[0:len(wind_10m_data_fcsth_i) - 1]
-    wind_10m_data_fcsth_i_test = wind_10m_data_fcsth_i.iloc[-1:]
+    wind_10m_data_fcsth_i_train = wind_10m_data_fcsth_i[['ens_mean', 'ens_sd', 'obs']].iloc[0:len(wind_10m_data_fcsth_i) - 1]
+    wind_10m_data_fcsth_i_test = wind_10m_data_fcsth_i[['ens_mean', 'ens_sd']].iloc[-1:]
 
     with localconverter(robjects.default_converter + pandas2ri.converter):
         wind_10m_data_fcsth_i_train_r = robjects.conversion.py2rpy(wind_10m_data_fcsth_i_train)
@@ -104,17 +103,17 @@ for i in horizon:
     r_h = robjects.globalenv['h']
     prediction_mu = (r_g(rf_model, wind_10m_data_fcsth_i_test_r)).values
     prediction_sd = (r_h(rf_model, wind_10m_data_fcsth_i_test_r)).values
-    crps_fun = scoringRules.crps
-    r_float = robjects.vectors.FloatVector
-    y_true_r = r_float(wind_10m_data_fcsth_i_test['obs'])
-    mu_r = r_float(prediction_mu)
-    sigma_r = r_float(prediction_sd)
-    score = scoringRules.crps(y_true_r, mean=mu_r, sd=sigma_r, family="normal")
+    # crps_fun = scoringRules.crps
+    # r_float = robjects.vectors.FloatVector
+    # y_true_r = r_float(wind_10m_data_fcsth_i_test['obs'])
+    # mu_r = r_float(prediction_mu)
+    # sigma_r = r_float(prediction_sd)
+    # score = scoringRules.crps(y_true_r, mean=mu_r, sd=sigma_r, family="normal")
     #    mean_crps_score = np.array(score).mean()
 
     estimated_params['mu'][estimated_params['horizon'] == i] = prediction_mu
     estimated_params['sd'][estimated_params['horizon'] == i] = prediction_sd
-    estimated_params['crps'][estimated_params['horizon'] == i] = score
+#    estimated_params['crps'][estimated_params['horizon'] == i] = score
 
     quantile_levels = [0.025,0.25,0.5,0.75,0.975]
 
