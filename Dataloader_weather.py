@@ -80,7 +80,7 @@ def DataUpdaterWeather(last_wednesday):
     data_full = df.append(new_weather_forecasts)
     data_full.to_csv('/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv', index = False)
 
-    return
+    return data_full
 
 def DataLoaderWeather(df):
 

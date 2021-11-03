@@ -40,12 +40,12 @@ scoringRules = rpackages.importr('scoringRules')
 crch = rpackages.importr('crch')
 """ load weather data """
 #DataUpdaterWeather(update_only_R_data=True)
-DataUpdaterWeather('2021-10-27')
-file_path_data_full = '/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv'
+full_weather_data = DataUpdaterWeather('2021-11-03')
+#file_path_data_full = '/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv'
 # full_weather_data = pd.read_csv('/Users/franziska/PycharmProjects/PTSFC/data/weather/icon_eps_weather_full.csv')
-full_weather_data = RealObservationsAdder(
-    file_path_data_full,
-    '/Users/franziska/Dropbox/DataPTSFC/produkt_tu_stunde_20200501_20211101_00433.txt', 't_2m')
+# full_weather_data = RealObservationsAdder(
+#     file_path_data_full,
+#     '/Users/franziska/Dropbox/DataPTSFC/produkt_tu_stunde_20200501_20211101_00433.txt', 't_2m')
 
 df_aswdir_s, df_clct, df_mslp, df_t_2m, df_wind_10m = DataLoaderWeather(full_weather_data)
 df_t_2m = df_t_2m.dropna()
