@@ -281,4 +281,6 @@ def check_df_excl_weather(df, exclude_weather):
 submission_date = datetime.strftime(datetime.now(), '%Y-%m-%d')
 df = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/' + submission_date.replace('-','') + '_ChandlerBing.csv')
 
-check_df_excl_weather(df, True)
+#check_df_excl_weather(df, True)
+
+check_df(df)
