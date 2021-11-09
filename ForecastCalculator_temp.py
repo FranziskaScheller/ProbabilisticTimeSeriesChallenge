@@ -27,17 +27,11 @@ names_to_install = [x for x in packnames if not rpackages.isinstalled(x)]
 if len(names_to_install) > 0:
     utils.install_packages(StrVector(names_to_install))
 
-# install.packages("xfun")
 xfun = importr('xfun')
 scoringRules = rpackages.importr('scoringRules')
 crch = rpackages.importr('crch')
 """ load weather data """
 full_weather_data = DataUpdaterWeather('2021-11-03')
-#file_path_data_full = '/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv'
-# full_weather_data = pd.read_csv('/Users/franziska/PycharmProjects/PTSFC/data/weather/icon_eps_weather_full.csv')
-# full_weather_data = RealObservationsAdder(
-#     file_path_data_full,
-#     '/Users/franziska/Dropbox/DataPTSFC/produkt_tu_stunde_20200501_20211101_00433.txt', 't_2m')
 
 df_aswdir_s, df_clct, df_mslp, df_t_2m, df_wind_10m = DataLoaderWeather(full_weather_data)
 #df_t_2m = df_t_2m.dropna()
@@ -55,7 +49,7 @@ for year in df_t_2m['obs_tm_h'].dt.year.unique():
     plt.ylabel('temperature in degree celcius')
     ind = ind + 1
     plt.show()
-    plt.savefig(str(year) + 'timeseries_raw_data.png')
+    plt.savefig('/Users/franziska/Dropbox/DataPTSFC/Plots/' + str(year) + 'timeseries_raw_data.png')
 
 df_t_2m['ens_mean'] = df_t_2m[["ens_" + str(i) for i in range(1, 41)]].mean(axis=1)
 df_t_2m['ens_var'] = df_t_2m[["ens_" + str(i) for i in range(1, 41)]].var(axis=1)
@@ -138,7 +132,7 @@ for i in horizon:
 
     #scipy.stats.norm(loc=prediction_mu, scale=prediction_sd).ppf(0.025)
 estimated_params[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/temp_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
-print(1)
+
 # with localconverter(robjects.default_converter + pandas2ri.converter):
 #  t2m_data_fcsth48_obs_r = robjects.conversion.py2rpy(t2m_data_fcsth48['obs'])
 #  t2m_data_fcsth48_obs_r_2 = robjects.vectors.FloatVector(t2m_data_fcsth48['obs'])

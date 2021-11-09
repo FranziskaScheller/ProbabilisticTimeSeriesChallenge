@@ -70,7 +70,6 @@ Steps:
 1. Check trend and seasonality with ACF (Autocorrelation function), PACF (Partial ACF), Plots and Tests 
 """
 rets = rets.dropna()
-#plt.subplot(511)
 plot_acf(rets['ret_1'].values, lags=10)
 plt.title('ACF for 1d returns of DAX')
 plt.show()
@@ -92,7 +91,7 @@ ax5 = f.add_subplot(515)
 rets['ret_5'].plot(ax=ax5)
 ax5.title.set_text('Time series of 5d returns')
 plt.show()
-plt.savefig('raw_DAX_data_returns_different_fc_horizons.png')
+plt.savefig('/Users/franziska/Dropbox/DataPTSFC/Plots/raw_DAX_data_returns_different_fc_horizons.png')
 
 f = plt.figure(figsize=(6, 14))
 ax1 = f.add_subplot(511)
@@ -111,7 +110,7 @@ ax5 = f.add_subplot(515)
 plot_acf(rets['ret_5'].values, lags=10, ax=ax5)
 ax5.title.set_text('ACF of 5d returns')
 plt.show()
-plt.savefig('ACF_raw_DAX_data_returns_different_fc_horizons.png')
+plt.savefig('/Users/franziska/Dropbox/DataPTSFC/Plots/ACF_raw_DAX_data_returns_different_fc_horizons.png')
 
 f = plt.figure(figsize=(6, 14))
 ax1 = f.add_subplot(511)
@@ -130,7 +129,7 @@ ax5 = f.add_subplot(515)
 plot_pacf(rets['ret_5'].values, lags=10, ax=ax5)
 ax5.title.set_text('PACF of 5d returns')
 plt.show()
-plt.savefig('PACF_raw_DAX_data_returns_different_fc_horizons.png')
+plt.savefig('/Users/franziska/Dropbox/DataPTSFC/Plots/PACF_raw_DAX_data_returns_different_fc_horizons.png')
 
 
 basic_gm = arch_model(rets['ret_1'], p = 1, q = 1,
@@ -140,8 +139,6 @@ gm_result = basic_gm.fit()
 gm_forecast = gm_result.forecast(horizon=1)
 forecast_mean = gm_forecast.mean[-1:]
 forecast_var = gm_forecast.variance[-1:]
-print(1)
-
 
 """
 Select model based on rolling window performance

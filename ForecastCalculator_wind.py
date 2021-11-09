@@ -26,14 +26,11 @@ names_to_install = [x for x in packnames if not rpackages.isinstalled(x)]
 if len(names_to_install) > 0:
     utils.install_packages(StrVector(names_to_install))
 
-# install.packages("xfun")
 xfun = importr('xfun')
 scoringRules = rpackages.importr('scoringRules')
 crch = rpackages.importr('crch')
 """ load wind data """
 full_wind_data = DataUpdaterWeather('2021-11-03')
-#file_path_data_full = '/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv'
-#full_wind_data = RealObservationsAdder(file_path_data_full, '/Users/franziska/Dropbox/DataPTSFC/produkt_ff_stunde_20200501_20211101_00433.txt', 'wind_10m')
 
 df_aswdir_s, df_clct, df_mslp, df_t_2m, df_wind_10m = DataLoaderWeather(full_wind_data)
 
@@ -50,7 +47,7 @@ for year in df_wind_10m['obs_tm_h'].dt.year.unique():
     plt.ylabel('wind in km/h')
     ind = ind + 1
     plt.show()
-    plt.savefig(str(year) + 'wind_timeseries_raw_data.png')
+    plt.savefig('/Users/franziska/Dropbox/DataPTSFC/Plots/' + str(year) + 'wind_timeseries_raw_data.png')
 
 df_wind_10m['ens_mean'] = df_wind_10m[["ens_" + str(i) for i in range(1, 41)]].mean(axis=1)
 df_wind_10m['ens_var'] = df_wind_10m[["ens_" + str(i) for i in range(1, 41)]].var(axis=1)

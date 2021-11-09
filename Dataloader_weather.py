@@ -1,4 +1,3 @@
-import rpy2
 import rpy2.robjects as robjects
 import rpy2.robjects.pandas2ri as pandas2ri
 from rpy2.robjects.conversion import localconverter
@@ -7,12 +6,9 @@ import rpy2.robjects.packages as rpackages
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-import dwdweather
-from dwdweather import DwdWeather
 
 base = importr('base')
 utils = rpackages.importr('utils')
-# select a mirror for R packages
 utils.chooseCRANmirror(ind=1)
 # R package names
 packnames = ('ggplot2', 'hexbin')
@@ -21,7 +17,6 @@ from rpy2.robjects.vectors import StrVector
 names_to_install = [x for x in packnames if not rpackages.isinstalled(x)]
 if len(names_to_install) > 0:
     utils.install_packages(StrVector(names_to_install))
-
 
 #dwd = DwdWeather(resolution='hourly')
 #query_hour = datetime(2014, 3, 22, 12)
@@ -113,12 +108,10 @@ def RealObservationsAdder(file_path_data_full, file_path_for_update, variable_in
     if variable_indicator == 't_2m':
         temperature = real_obs[['MESS_DATUM', 'TT_TU']]
         temperature['met_var'] = 't_2m'
-        #data_full[(data_full['met_var'] == 't_2m') & (np.isnan(data_full['obs']) == True)]['obs'] =
 
         data_full_merge = data_full_merge.merge(temperature, on = ['met_var', 'MESS_DATUM'], how = 'outer')
         data_full_merge['obs'] = data_full_merge['obs'].fillna(data_full_merge['TT_TU'])
         data_full_merge = data_full_merge.drop(columns=['TT_TU'])
-        #data_full_merge = data_full_merge.dropna()
         data_full_merge.to_csv(file_path_data_full.replace('.csv','') + '_updated_real_obs_temp.csv', index=False)
 
     elif variable_indicator == 'wind_10m':
@@ -128,7 +121,6 @@ def RealObservationsAdder(file_path_data_full, file_path_for_update, variable_in
         data_full_merge = data_full_merge.merge(wind, on = ['met_var', 'MESS_DATUM'], how = 'outer')
         data_full_merge['obs'] = data_full_merge['obs'].fillna(data_full_merge['   F'])
         data_full_merge = data_full_merge.drop(columns=['   F'])
-        #data_full_merge = data_full_merge.dropna()
         data_full_merge.to_csv(file_path_data_full.replace('.csv','') + '_updated_real_obs_wind.csv', index=False)
 
     return data_full_merge
@@ -142,7 +134,6 @@ def DataPreparer(last_wednesday):
         data = pd.read_csv(file_name, sep=",", header=None)
         data = data[4:]
         data = data[0].str.split('|', 42, expand=True)
-        # ENS_COLS = ["empty", "fcst_hour"] + ["ens_" + str(i) for i in range(1, 41)] + ["empty"]
         data = data.drop(labels=0, axis=1)
         data = data.drop(labels=42, axis=1)
         data = data.astype(np.float32)
@@ -187,15 +178,3 @@ def DataPreparer(last_wednesday):
     data_full.to_csv(file_path, index = False)
 
     return data_full
-
-
-#file_path_data_full = '/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv'
-#full_weather_data = RealObservationsAdder(
-#    file_path_data_full,
-#    '/Users/franziska/Dropbox/DataPTSFC/produkt_tu_stunde_20200426_20211027_00433.txt', 't_2m')
-
-#file_path_data_full = '/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv'
-#RealObservationsAdder(file_path_data_full, '/Users/franziska/Dropbox/DataPTSFC/produkt_ff_stunde_20200426_20211027_00433.txt', 'wind_10m')
-
-
-#print(1)

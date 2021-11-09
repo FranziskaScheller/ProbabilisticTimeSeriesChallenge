@@ -1,10 +1,6 @@
-# %%
-import sys
 import pandas as pd
 import numpy as np
-import warnings
 from datetime import datetime
-
 
 def check_df(df):
     EXPECTED_COLS = ["forecast_date", "target", "horizon", "q0.025", "q0.25",
@@ -27,7 +23,6 @@ def check_df(df):
     print("---------------------------")
     col_names = df.columns
 
-    # %%
     print("Checking the Columns...")
     # Check column length
     if len(col_names) != LEN_EXP_COLS:
@@ -51,7 +46,6 @@ def check_df(df):
             print("Stopping early...")
             quit()
 
-    # %%
     # Date Col
     print("Checking type of columns...")
     try:
@@ -139,8 +133,6 @@ def check_df(df):
     print("---------------------------")
     print("Looks good!")
 
-
-
 def check_df_excl_weather(df, exclude_weather):
     EXPECTED_COLS = ["forecast_date", "target", "horizon", "q0.025", "q0.25",
                      "q0.5", "q0.75", "q0.975"]
@@ -165,7 +157,6 @@ def check_df_excl_weather(df, exclude_weather):
     print("---------------------------")
     col_names = df.columns
 
-    # %%
     print("Checking the Columns...")
     # Check column length
     if len(col_names) != LEN_EXP_COLS:
@@ -189,7 +180,6 @@ def check_df_excl_weather(df, exclude_weather):
             print("Stopping early...")
             quit()
 
-    # %%
     # Date Col
     print("Checking type of columns...")
     try:
@@ -220,7 +210,6 @@ def check_df_excl_weather(df, exclude_weather):
             print("Stopping early...")
             quit()
 
-            # %%
     print("Checking if the Dates make sense...")
 
     if len(pd.unique(df["forecast_date"])) > 1:
@@ -280,7 +269,5 @@ def check_df_excl_weather(df, exclude_weather):
 
 submission_date = datetime.strftime(datetime.now(), '%Y-%m-%d')
 df = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/' + submission_date.replace('-','') + '_ChandlerBing.csv')
-
-#check_df_excl_weather(df, True)
 
 check_df(df)
