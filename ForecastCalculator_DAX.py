@@ -9,6 +9,7 @@ import statsmodels.formula.api as smf
 import sklearn
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from arch import arch_model
+from sklearn.metrics import mean_pinball_loss
 
 GDAXI = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/GDAXI/^GDAXI.csv')
 GDAXI = GDAXI.dropna()
@@ -19,8 +20,8 @@ GDAXI_adj_close = GDAXI[['Date', 'Adj Close']]
 def ReturnComputer(y, type, diff_in_periods):
 
     n = len(y)
-    y_2 = y[0+diff_in_periods:].reset_index().drop(columns = 'index')
-    y_1 = y[0:n-diff_in_periods].reset_index().drop(columns = 'index')
+    y_2 = y[0+diff_in_periods:].reset_index().drop(columns='index')
+    y_1 = y[0:n-diff_in_periods].reset_index().drop(columns='index')
 
     if type == 'log':
         ret = 100*(np.log(y_2) - np.log(y_1))
@@ -43,6 +44,9 @@ rets['ret_5'] = ReturnComputer(pd.DataFrame(GDAXI_adj_close['Adj Close']), 'log'
 
 quantile_levels = [0.025, 0.25, 0.5, 0.75, 0.975]
 
+"""
+Quantile regression for quantile predictions
+"""
 predictions_quant_reg = pd.DataFrame(np.zeros((5, 6)), columns=['quantile', '1', '2', '3', '4', '5'])
 predictions_quant_reg['quantile'] = [str(i) for i in quantile_levels]
 
@@ -132,7 +136,7 @@ plt.show()
 plt.savefig('/Users/franziska/Dropbox/DataPTSFC/Plots/PACF_raw_DAX_data_returns_different_fc_horizons.png')
 
 
-basic_gm = arch_model(rets['ret_1'], p = 1, q = 1,
+basic_gm = arch_model(rets['ret_1'], p=1, q=1,
                       mean = 'constant', vol = 'GARCH', dist = 'normal')
 # Fit the model
 gm_result = basic_gm.fit()
@@ -144,41 +148,81 @@ forecast_var = gm_forecast.variance[-1:]
 Select model based on rolling window performance
 """
 rets = rets.reset_index(inplace=False)
-rets = rets.drop(columns = ['index'])
-n = len(rets)
-start_date_train = rets['Date'][0]
-end_date_train = rets['Date'][len(rets)-2]
-#end_date_train = start_date_train + timedelta(days=365)
-train_init = rets[rets['Date'] <= end_date_train]
-test_data = rets[rets['Date'] > end_date_train]
-n_train = len(train_init)
+rets = rets.drop(columns=['index'])
 
-col_names = ["mean_fcst_" + str(i) for i in range(1, 6)] + ["var_fcst_" + str(i) for i in range(1, 6)] + ['crps_' + str(i) for i in range(1,6)]
-df_forecasts = pd.DataFrame(np.zeros((len(range(0, n-n_train)), 15)), columns=col_names)
-df_forecasts['Date'] = rets['Date'][rets['Date'] > end_date_train].values
-for i in range(0, n-n_train):
-    train_dat = rets[(start_date_train <= rets['Date']) & (rets['Date'] <= end_date_train)]
-    for d in range(1, 6):
-        basic_gm = arch_model(train_dat['ret_' + str(d)], p=1, q=1,
-                              mean='constant', vol='GARCH', dist='normal')
-        # Fit the model
-        gm_result = basic_gm.fit()
-        gm_forecast = gm_result.forecast(horizon=1)
-        df_forecasts['mean_fcst_' + str(d)].iloc[i] = gm_forecast.mean[-1:]['h.1'].values
-        df_forecasts['var_fcst_' + str(d)].iloc[i] = gm_forecast.variance[-1:]['h.1'].values
-    
-    start_date_train = start_date_train + timedelta(days=1)
-    end_date_train = end_date_train + timedelta(days=1)
+def GarchFitter(data, len_train_data_in_days):
 
+    n = len(data)
+    start_date_train = data['Date'][0]
+    #end_date_train = rets['Date'][len(rets)-2]
+    end_date_train = start_date_train + timedelta(days=len_train_data_in_days)
+    n_train = len(data[data['Date'] <= end_date_train])
+    #train_init = rets[rets['Date'] <= end_date_train]
+    #test_data = rets[rets['Date'] > end_date_train]
+
+    col_names = ["mean_fcst_" + str(i) for i in range(1, 6)] + ["var_fcst_" + str(i) for i in range(1, 6)] + ['crps_' + str(i) for i in range(1,6)]
+    df_forecasts = pd.DataFrame(np.zeros((len(range(0, n-n_train)), 15)), columns=col_names)
+    df_forecasts['Date'] = data['Date'][data['Date'] > end_date_train].values
+    for i in range(0, n-n_train):
+        train_dat = data[(start_date_train <= data['Date']) & (data['Date'] < end_date_train)]
+        for d in range(1, 6):
+            basic_gm = arch_model(train_dat['ret_' + str(d)], p=1, q=1,
+                                  mean='constant', vol='GARCH', dist='normal')
+            # Fit the model
+            gm_result = basic_gm.fit()
+            gm_forecast = gm_result.forecast(horizon=1)
+            df_forecasts['mean_fcst_' + str(d)].iloc[i] = gm_forecast.mean[-1:].values
+            df_forecasts['var_fcst_' + str(d)].iloc[i] = gm_forecast.variance[-1:].values
+
+        start_date_train = start_date_train + timedelta(days=1)
+        end_date_train = end_date_train + timedelta(days=1)
+
+    quantile_scores = pd.DataFrame(np.zeros((len(df_forecasts), 25)), columns=["quantile_horizon_" + str(h) + '_q' + str(q) for q in quantile_levels for h in range(1,6)])
+
+    for t in range(0, len(df_forecasts)):
+        for i in range(1, 6):
+            for q in quantile_levels:
+                quantile_scores["quantile_horizon_" + str(i) + '_q' + str(q)].iloc[t] = norm(loc=df_forecasts['mean_fcst_' + str(i)].iloc[t], scale=np.sqrt(df_forecasts['var_fcst_' + str(i)].iloc[t])).ppf(q)
+
+    mean_quantile_scores = pd.DataFrame(np.zeros((26,2)), columns = ['description_type_of_mean', 'mean'])
+    j = 0
+    for i in range(1, 6):
+        for q in quantile_levels:
+            mean_quantile_scores['description_type_of_mean'].iloc[j] = 'quantile_score_horizon_' + str(i) + '_q' + str(q)
+            mean_quantile_scores['mean'].iloc[j] = mean_pinball_loss(rets[rets['Date'] >= df_forecasts['Date'].iloc[0]]['ret_' + str(i)], quantile_scores["quantile_horizon_" + str(i) + '_q' + str(q)])
+            j = j + 1
+
+    mean_quantile_scores['description_type_of_mean'].iloc[j] = 'quantile_score_overall'
+    mean_quantile_scores['mean'].iloc[j] = mean_quantile_scores['mean'].mean()
+
+    return mean_quantile_scores
+
+mat_len_train_dat = [30, 120, 182, 365, 730]
+mean_quantile_scores_diff_length = pd.DataFrame(np.zeros((len(mat_len_train_dat),2)), columns = ['days_train_data', 'mean_quantile_score'] )
+ind = 0
+for days in mat_len_train_dat:
+    mean_quantile_scores = GarchFitter(rets, days)
+    mean_quantile_scores_diff_length['days_train_data'].iloc[ind] = days
+    mean_quantile_scores_diff_length['mean_quantile_score'].iloc[ind] = mean_quantile_scores[mean_quantile_scores['description_type_of_mean'] == 'quantile_score_overall']['mean']
+    ind = ind + 1
+"""
+Findings: q0.025 and q0.975 have a worse quantile score compared to the other quantile levels -> find out why 
+(maybe because of specific time where forecasts were completely wrong and weights for these quantiles larger, or assumption of normal distribution not good)
+-> plot individual quantile scores over time 
+"""
+
+"""
+Forecasts next 5 days 
+"""
 estimated_params = pd.DataFrame(np.zeros((5, 6)), columns=['quantile', '1', '2', '3', '4', '5'])
 estimated_params['quantile'] = [str(i) for i in quantile_levels]
 
-for i in range(1,6):
+for i in range(1, 6):
     for q in quantile_levels:
         percentile_q = norm(loc=df_forecasts['mean_fcst_' + str(i)].iloc[0], scale=np.sqrt(df_forecasts['var_fcst_' + str(i)].iloc[0])).ppf(q)
         estimated_params[str(i)][estimated_params['quantile'] == str(q)] = percentile_q
 
-estimated_params.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/DAX_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+#estimated_params.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/DAX_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
 # evaluate with crps
 scoringRules = rpackages.importr('scoringRules')
 crps_fun = scoringRules.crps
@@ -190,13 +234,6 @@ for i in range(0, len(df_forecasts)):
         mu_r = r_float(df_forecasts[['mean_fcst_' + str(j)]].iloc[i])
         sigma_r = r_float(np.sqrt(df_forecasts[['var_fcst_' + str(j)]].iloc[i]))
         df_forecasts['crps_' + str(j)].iloc[i] = np.array(scoringRules.crps(y_true_r, mean=mu_r, sd=sigma_r, family="normal"))
-
-
-# for j in range(0, len(df_forecasts)):
-#     for i in range(1, 6):
-#         for q in quantile_levels:
-#             percentile_q = norm(loc=df_forecasts['mean_fcst_' + str(i)].iloc[j], scale=np.sqrt(df_forecasts['var_fcst_' + str(i)].iloc[j])).ppf(q)
-#             df_forecasts[str(q)].iloc[j] = percentile_q
 
 """
 Evaluation of predictions with pinball loss and tests 
