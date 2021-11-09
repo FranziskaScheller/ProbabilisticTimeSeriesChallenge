@@ -1,11 +1,19 @@
 import pandas as pd
 import numpy as np
-from datetime import datetime
-import statsmodels.api as sm
+from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+import rpy2.robjects.packages as rpackages
+import rpy2.robjects as robjects
+from scipy.stats import norm
 import statsmodels.formula.api as smf
+import sklearn
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from arch import arch_model
 
 GDAXI = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/GDAXI/^GDAXI.csv')
+GDAXI = GDAXI.dropna()
 GDAXI['Date']= GDAXI['Date'].apply(lambda x: datetime.strptime(x,'%Y-%m-%d'))
+#GDAXI = GDAXI[GDAXI['Date'] >= datetime.strptime('2019-09-27', '%Y-%m-%d')].reset_index(drop=True)
 GDAXI_adj_close = GDAXI[['Date', 'Adj Close']]
 
 def ReturnComputer(y, type, diff_in_periods):
@@ -55,3 +63,146 @@ for h in range(1,6):
         predictions_quant_reg[str(h)].iloc[i] = pred
         i = i + 1
 
+#predictions_quant_reg.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/DAX_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+"""
+Implementation of GARCH model 
+Steps: 
+1. Check trend and seasonality with ACF (Autocorrelation function), PACF (Partial ACF), Plots and Tests 
+"""
+rets = rets.dropna()
+plot_acf(rets['ret_1'].values, lags=10)
+plt.title('ACF for 1d returns of DAX')
+plt.show()
+
+f = plt.figure(figsize=(6, 14))
+ax1 = f.add_subplot(511)
+rets['ret_1'].plot(ax=ax1)
+ax1.title.set_text('Time series of 1d returns')
+ax2 = f.add_subplot(512)
+rets['ret_2'].plot(ax=ax2)
+ax2.title.set_text('Time series of 2d returns')
+ax3 = f.add_subplot(513)
+rets['ret_3'].plot(ax=ax3)
+ax3.title.set_text('Time series of 3d returns')
+ax4 = f.add_subplot(514)
+rets['ret_4'].plot(ax=ax4)
+ax4.title.set_text('Time series of 4d returns')
+ax5 = f.add_subplot(515)
+rets['ret_5'].plot(ax=ax5)
+ax5.title.set_text('Time series of 5d returns')
+plt.show()
+plt.savefig('/Users/franziska/Dropbox/DataPTSFC/Plots/raw_DAX_data_returns_different_fc_horizons.png')
+
+f = plt.figure(figsize=(6, 14))
+ax1 = f.add_subplot(511)
+plot_acf(rets['ret_1'].values, lags=10, ax=ax1)
+ax1.title.set_text('ACF of 1d returns')
+ax2 = f.add_subplot(512)
+plot_acf(rets['ret_2'].values, lags=10, ax=ax2)
+ax2.title.set_text('ACF of 2d returns')
+ax3 = f.add_subplot(513)
+plot_acf(rets['ret_3'].values, lags=10, ax=ax3)
+ax3.title.set_text('ACF of 3d returns')
+ax4 = f.add_subplot(514)
+plot_acf(rets['ret_4'].values, lags=10, ax=ax4)
+ax4.title.set_text('ACF of 4d returns')
+ax5 = f.add_subplot(515)
+plot_acf(rets['ret_5'].values, lags=10, ax=ax5)
+ax5.title.set_text('ACF of 5d returns')
+plt.show()
+plt.savefig('/Users/franziska/Dropbox/DataPTSFC/Plots/ACF_raw_DAX_data_returns_different_fc_horizons.png')
+
+f = plt.figure(figsize=(6, 14))
+ax1 = f.add_subplot(511)
+plot_pacf(rets['ret_1'].values, lags=10, ax=ax1)
+ax1.title.set_text('PACF of 1d returns')
+ax2 = f.add_subplot(512)
+plot_pacf(rets['ret_2'].values, lags=10, ax=ax2)
+ax2.title.set_text('PACF of 2d returns')
+ax3 = f.add_subplot(513)
+plot_pacf(rets['ret_3'].values, lags=10, ax=ax3)
+ax3.title.set_text('PACF of 3d returns')
+ax4 = f.add_subplot(514)
+plot_pacf(rets['ret_4'].values, lags=10, ax=ax4)
+ax4.title.set_text('PACF of 4d returns')
+ax5 = f.add_subplot(515)
+plot_pacf(rets['ret_5'].values, lags=10, ax=ax5)
+ax5.title.set_text('PACF of 5d returns')
+plt.show()
+plt.savefig('/Users/franziska/Dropbox/DataPTSFC/Plots/PACF_raw_DAX_data_returns_different_fc_horizons.png')
+
+
+basic_gm = arch_model(rets['ret_1'], p = 1, q = 1,
+                      mean = 'constant', vol = 'GARCH', dist = 'normal')
+# Fit the model
+gm_result = basic_gm.fit()
+gm_forecast = gm_result.forecast(horizon=1)
+forecast_mean = gm_forecast.mean[-1:]
+forecast_var = gm_forecast.variance[-1:]
+
+"""
+Select model based on rolling window performance
+"""
+rets = rets.reset_index(inplace=False)
+rets = rets.drop(columns = ['index'])
+n = len(rets)
+start_date_train = rets['Date'][0]
+end_date_train = rets['Date'][len(rets)-2]
+#end_date_train = start_date_train + timedelta(days=365)
+train_init = rets[rets['Date'] <= end_date_train]
+test_data = rets[rets['Date'] > end_date_train]
+n_train = len(train_init)
+
+col_names = ["mean_fcst_" + str(i) for i in range(1, 6)] + ["var_fcst_" + str(i) for i in range(1, 6)] + ['crps_' + str(i) for i in range(1,6)]
+df_forecasts = pd.DataFrame(np.zeros((len(range(0, n-n_train)), 15)), columns=col_names)
+df_forecasts['Date'] = rets['Date'][rets['Date'] > end_date_train].values
+for i in range(0, n-n_train):
+    train_dat = rets[(start_date_train <= rets['Date']) & (rets['Date'] <= end_date_train)]
+    for d in range(1, 6):
+        basic_gm = arch_model(train_dat['ret_' + str(d)], p=1, q=1,
+                              mean='constant', vol='GARCH', dist='normal')
+        # Fit the model
+        gm_result = basic_gm.fit()
+        gm_forecast = gm_result.forecast(horizon=1)
+        df_forecasts['mean_fcst_' + str(d)].iloc[i] = gm_forecast.mean[-1:]['h.1'].values
+        df_forecasts['var_fcst_' + str(d)].iloc[i] = gm_forecast.variance[-1:]['h.1'].values
+    
+    start_date_train = start_date_train + timedelta(days=1)
+    end_date_train = end_date_train + timedelta(days=1)
+
+estimated_params = pd.DataFrame(np.zeros((5, 6)), columns=['quantile', '1', '2', '3', '4', '5'])
+estimated_params['quantile'] = [str(i) for i in quantile_levels]
+
+for i in range(1,6):
+    for q in quantile_levels:
+        percentile_q = norm(loc=df_forecasts['mean_fcst_' + str(i)].iloc[0], scale=np.sqrt(df_forecasts['var_fcst_' + str(i)].iloc[0])).ppf(q)
+        estimated_params[str(i)][estimated_params['quantile'] == str(q)] = percentile_q
+
+estimated_params.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/DAX_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+# evaluate with crps
+scoringRules = rpackages.importr('scoringRules')
+crps_fun = scoringRules.crps
+r_float = robjects.vectors.FloatVector
+
+for i in range(0, len(df_forecasts)):
+    for j in range(1,6):
+        y_true_r = r_float(test_data[['ret_' + str(j)]].iloc[i])
+        mu_r = r_float(df_forecasts[['mean_fcst_' + str(j)]].iloc[i])
+        sigma_r = r_float(np.sqrt(df_forecasts[['var_fcst_' + str(j)]].iloc[i]))
+        df_forecasts['crps_' + str(j)].iloc[i] = np.array(scoringRules.crps(y_true_r, mean=mu_r, sd=sigma_r, family="normal"))
+
+
+# for j in range(0, len(df_forecasts)):
+#     for i in range(1, 6):
+#         for q in quantile_levels:
+#             percentile_q = norm(loc=df_forecasts['mean_fcst_' + str(i)].iloc[j], scale=np.sqrt(df_forecasts['var_fcst_' + str(i)].iloc[j])).ppf(q)
+#             df_forecasts[str(q)].iloc[j] = percentile_q
+
+"""
+Evaluation of predictions with pinball loss and tests 
+"""
+
+
+print(1)
+
+#sklearn.metrics.mean_pinball_loss()

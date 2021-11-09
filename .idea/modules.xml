@@ -3,7 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/ProbabilisticTimeSeriesChallenge.iml" filepath="$PROJECT_DIR$/.idea/ProbabilisticTimeSeriesChallenge.iml" />
-      <module fileurl="file://$PROJECT_DIR$/kit-weather-ensemble-point-forecast-karlsruhe/.idea/kit-weather-ensemble-point-forecast-karlsruhe.iml" filepath="$PROJECT_DIR$/kit-weather-ensemble-point-forecast-karlsruhe/.idea/kit-weather-ensemble-point-forecast-karlsruhe.iml" />
+      <module fileurl="file://$PROJECT_DIR$/kit-weather-ensemble-point-forecast-berlin/.idea/kit-weather-ensemble-point-forecast-berlin.iml" filepath="$PROJECT_DIR$/kit-weather-ensemble-point-forecast-berlin/.idea/kit-weather-ensemble-point-forecast-berlin.iml" />
     </modules>
   </component>
 </project>
