@@ -10,6 +10,7 @@ import sklearn
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from arch import arch_model
 from sklearn.metrics import mean_pinball_loss
+from itertools import permutations
 
 GDAXI = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/GDAXI/^GDAXI.csv')
 GDAXI = GDAXI.dropna()
@@ -157,14 +158,12 @@ def GarchFitter(data, len_train_data_in_days):
     #end_date_train = rets['Date'][len(rets)-2]
     end_date_train = start_date_train + timedelta(days=len_train_data_in_days)
     n_train = len(data[data['Date'] <= end_date_train])
-    #train_init = rets[rets['Date'] <= end_date_train]
-    #test_data = rets[rets['Date'] > end_date_train]
 
     col_names = ["mean_fcst_" + str(i) for i in range(1, 6)] + ["var_fcst_" + str(i) for i in range(1, 6)] + ['crps_' + str(i) for i in range(1,6)]
     df_forecasts = pd.DataFrame(np.zeros((len(range(0, n-n_train)), 15)), columns=col_names)
     df_forecasts['Date'] = data['Date'][data['Date'] > end_date_train].values
     for i in range(0, n-n_train):
-        train_dat = data[(start_date_train <= data['Date']) & (data['Date'] < end_date_train)]
+        train_dat = data[(start_date_train <= data['Date']) & (data['Date'] <= end_date_train)]
         for d in range(1, 6):
             basic_gm = arch_model(train_dat['ret_' + str(d)], p=1, q=1,
                                   mean='constant', vol='GARCH', dist='normal')
@@ -198,6 +197,8 @@ def GarchFitter(data, len_train_data_in_days):
     return mean_quantile_scores
 
 mat_len_train_dat = [30, 120, 182, 365, 730]
+#perm = permutations([0, 1, 2], 2)
+# list(permutations([0, 1, 2], 2))[0][0]
 mean_quantile_scores_diff_length = pd.DataFrame(np.zeros((len(mat_len_train_dat),2)), columns = ['days_train_data', 'mean_quantile_score'] )
 ind = 0
 for days in mat_len_train_dat:
@@ -205,6 +206,8 @@ for days in mat_len_train_dat:
     mean_quantile_scores_diff_length['days_train_data'].iloc[ind] = days
     mean_quantile_scores_diff_length['mean_quantile_score'].iloc[ind] = mean_quantile_scores[mean_quantile_scores['description_type_of_mean'] == 'quantile_score_overall']['mean']
     ind = ind + 1
+
+len_train_dat = mean_quantile_scores_diff_length['days_train_data'][mean_quantile_scores_diff_length['mean_quantile_score'] == mean_quantile_scores_diff_length['mean_quantile_score'].min()].values[0]
 """
 Findings: q0.025 and q0.975 have a worse quantile score compared to the other quantile levels -> find out why 
 (maybe because of specific time where forecasts were completely wrong and weights for these quantiles larger, or assumption of normal distribution not good)
@@ -214,6 +217,29 @@ Findings: q0.025 and q0.975 have a worse quantile score compared to the other qu
 """
 Forecasts next 5 days 
 """
+end_date_train = rets['Date'].iloc[-1]
+start_date_train = end_date_train - timedelta(days = len_train_dat)
+
+n = len(rets[rets['Date'] >= start_date_train])
+n_train = n
+
+col_names = ["mean_fcst_" + str(i) for i in range(1, 6)] + ["var_fcst_" + str(i) for i in range(1, 6)] + [
+    'crps_' + str(i) for i in range(1, 6)]
+df_forecasts = pd.DataFrame(np.zeros((1, 15)), columns=col_names)
+df_forecasts['Date'] = end_date_train + timedelta(days=1)
+train_dat = rets[(start_date_train <= rets['Date']) & (rets['Date'] <= end_date_train)]
+for d in range(1, 6):
+    basic_gm = arch_model(train_dat['ret_' + str(d)], p=1, q=1,
+                            mean='constant', vol='GARCH', dist='normal')
+    # Fit the model
+    gm_result = basic_gm.fit()
+    gm_forecast = gm_result.forecast(horizon=1)
+    df_forecasts['mean_fcst_' + str(d)].iloc[0] = gm_forecast.mean[-1:].values
+    df_forecasts['var_fcst_' + str(d)].iloc[0] = gm_forecast.variance[-1:].values
+
+    start_date_train = start_date_train + timedelta(days=1)
+    end_date_train = end_date_train + timedelta(days=1)
+
 estimated_params = pd.DataFrame(np.zeros((5, 6)), columns=['quantile', '1', '2', '3', '4', '5'])
 estimated_params['quantile'] = [str(i) for i in quantile_levels]
 
