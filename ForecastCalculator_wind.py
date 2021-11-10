@@ -30,7 +30,7 @@ xfun = importr('xfun')
 scoringRules = rpackages.importr('scoringRules')
 crch = rpackages.importr('crch')
 """ load wind data """
-full_wind_data = DataUpdaterWeather('2021-11-03')
+full_wind_data = DataUpdaterWeather('2021-11-10')
 
 df_aswdir_s, df_clct, df_mslp, df_t_2m, df_wind_10m = DataLoaderWeather(full_wind_data)
 
@@ -71,14 +71,24 @@ for i in horizon:
 
     pandas2ri.activate()
     robjects.globalenv['wind_10m_data_fcsth_i_train_r'] = wind_10m_data_fcsth_i_train
-    robjects.r('''
-               f <- function(wind_10m_data_fcsth_i_train) {
+    if i == 48:
+        robjects.r('''
+                   f <- function(wind_10m_data_fcsth_i_train) {
+    
+                            library(crch)
+                            train1.crch <- crch(obs ~ ens_mean|ens_sd, data = wind_10m_data_fcsth_i_train_r, dist = "gaussian", left = 11, truncated = TRUE, type = "crps", link.scale = "log")
+    
+                    }
+                    ''')
+    else:
+        robjects.r('''
+                   f <- function(wind_10m_data_fcsth_i_train) {
 
-                        library(crch)
-                        train1.crch <- crch(obs ~ ens_mean|ens_sd, data = wind_10m_data_fcsth_i_train_r, dist = "gaussian", left = 0, truncated = TRUE, type = "crps", link.scale = "log")
+                            library(crch)
+                            train1.crch <- crch(obs ~ ens_mean|ens_sd, data = wind_10m_data_fcsth_i_train_r, dist = "gaussian", left = 0, truncated = TRUE, type = "crps", link.scale = "log")
 
-                }
-                ''')
+                    }
+                    ''')
     r_f = robjects.globalenv['f']
     rf_model = (r_f(wind_10m_data_fcsth_i_train_r))
     res = pandas2ri.rpy2py(rf_model)
@@ -121,3 +131,7 @@ for i in horizon:
 
 estimated_params[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/wind_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
 print(1)
+
+"""
+Idea: systematic erros, biases etc more similar when same time of the year so only use this month and the 2 months around it for estimation 
+"""

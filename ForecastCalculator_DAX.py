@@ -250,16 +250,16 @@ for i in range(1, 6):
 
 #estimated_params.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/DAX_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
 # evaluate with crps
-scoringRules = rpackages.importr('scoringRules')
-crps_fun = scoringRules.crps
-r_float = robjects.vectors.FloatVector
-
-for i in range(0, len(df_forecasts)):
-    for j in range(1,6):
-        y_true_r = r_float(test_data[['ret_' + str(j)]].iloc[i])
-        mu_r = r_float(df_forecasts[['mean_fcst_' + str(j)]].iloc[i])
-        sigma_r = r_float(np.sqrt(df_forecasts[['var_fcst_' + str(j)]].iloc[i]))
-        df_forecasts['crps_' + str(j)].iloc[i] = np.array(scoringRules.crps(y_true_r, mean=mu_r, sd=sigma_r, family="normal"))
+# scoringRules = rpackages.importr('scoringRules')
+# crps_fun = scoringRules.crps
+# r_float = robjects.vectors.FloatVector
+#
+# for i in range(0, len(df_forecasts)):
+#     for j in range(1,6):
+#         y_true_r = r_float(test_data[['ret_' + str(j)]].iloc[i])
+#         mu_r = r_float(df_forecasts[['mean_fcst_' + str(j)]].iloc[i])
+#         sigma_r = r_float(np.sqrt(df_forecasts[['var_fcst_' + str(j)]].iloc[i]))
+#         df_forecasts['crps_' + str(j)].iloc[i] = np.array(scoringRules.crps(y_true_r, mean=mu_r, sd=sigma_r, family="normal"))
 
 """
 Evaluation of predictions with pinball loss and tests 
