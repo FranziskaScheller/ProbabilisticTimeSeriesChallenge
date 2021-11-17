@@ -32,7 +32,7 @@ xfun = importr('xfun')
 scoringRules = rpackages.importr('scoringRules')
 crch = rpackages.importr('crch')
 """ load weather data """
-full_weather_data = DataUpdaterWeather('2021-11-10')
+full_weather_data = DataUpdaterWeather('2021-11-17')
 
 df_aswdir_s, df_clct, df_mslp, df_t_2m, df_wind_10m = DataLoaderWeather(full_weather_data)
 #df_t_2m = df_t_2m.dropna()
@@ -64,16 +64,18 @@ horizon = [36, 48, 60, 72, 84]
 
 def EMOS_QuantileEstimatorRollingWindow(horizon, data, len_train_data):
 
+    data_len = data[(data['fcst_hour'] == horizon[0])]
+    estimated_params = pd.DataFrame(np.nan * np.zeros((len(data_len) - len_train_data + 10, 10)),
+                                    columns=["mu_" + str(i) for i in horizon] + ["sd_" + str(i) for i in horizon])
     for i in horizon:
         start_time_train = data['init_tm'].iloc[0]
-        end_time_train = start_time_train + timedelta(days=365)
-        data = data[(data['fcst_hour'] == i)]
-        estimated_params = pd.DataFrame(np.nan * np.zeros((len(data) - len_train_data, 10)), columns=["mu_" + str(i) for i in horizon] + ["sd_" + str(i) for i in horizon])
+        end_time_train = start_time_train + timedelta(days=len_train_data)
+        data_i = data[(data['fcst_hour'] == i)]
         for j in range(0, len(data) - len_train_data):
             # if j >= 12:
             #     print('stop')
-            data_train = data[(start_time_train <= data['init_tm']) & (data['init_tm'] <= end_time_train)].reset_index()
-            data_test = data[data['init_tm'] == end_time_train + timedelta(days=1)].reset_index()
+            data_train = data_i[(start_time_train <= data_i['init_tm']) & (data_i['init_tm'] <= end_time_train)].reset_index()
+            data_test = data_i[data_i['init_tm'] == end_time_train + timedelta(days=1)].reset_index()
             if len(data_test) == 1:
                 data_train_i = data_train[['init_tm','obs_tm', 'ens_mean', 'ens_sd', 'obs']]
                 data_test_i = data_test[['init_tm', 'obs_tm', 'ens_mean', 'ens_sd', 'obs']]
@@ -132,8 +134,11 @@ def EMOS_QuantileEstimatorRollingWindow(horizon, data, len_train_data):
             print(j)
         print(i)
 
-#EMOS_QuantileEstimatorRollingWindow(horizon, df_t_2m, 365)
+    return estimated_params
 
+#estimated_params_emos_rw = EMOS_QuantileEstimatorRollingWindow(horizon, df_t_2m, 365)
+
+print(1)
     #scipy.stats.norm(loc=prediction_mu, scale=prediction_sd).ppf(0.025)
 #estimated_params[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/temp_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
 

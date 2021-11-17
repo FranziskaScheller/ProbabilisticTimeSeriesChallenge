@@ -126,11 +126,11 @@ def RealObservationsAdder(file_path_data_full, file_path_for_update, variable_in
     return data_full_merge
 
 def DataPreparer(last_wednesday):
-
-    list_variable_names = ["aswdir_s","clct", "mslp", "t_2m", "wind_mean_10m"]
+    # todo: "aswdir_s" not there anymore?
+    list_variable_names = ["clct", "mslp", "t_2m", "wind_mean_10m"]
     indicator = 0
     for var_name in list_variable_names:
-        file_name = '/Users/franziska/PycharmProjects/ProbabilisticTimeSeriesChallenge/kit-weather-ensemble-point-forecast-berlin/icon-eu-eps_' + str(last_wednesday.strftime("%Y%m%d%H")) + '_' + var_name + '_Berlin.txt'
+        file_name = '/Users/franziska/PycharmProjects/ProbabilisticTimeSeriesChallenge/kit-weather-ensemble-point-forecast-berlin.git/icon-eu-eps_' + str(last_wednesday.strftime("%Y%m%d%H")) + '_' + var_name + '_Berlin.txt'
         data = pd.read_csv(file_name, sep=",", header=None)
         data = data[4:]
         data = data[0].str.split('|', 42, expand=True)

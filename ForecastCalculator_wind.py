@@ -30,7 +30,7 @@ xfun = importr('xfun')
 scoringRules = rpackages.importr('scoringRules')
 crch = rpackages.importr('crch')
 """ load wind data """
-full_wind_data = DataUpdaterWeather('2021-11-10')
+full_wind_data = DataUpdaterWeather('2021-11-17')
 
 df_aswdir_s, df_clct, df_mslp, df_t_2m, df_wind_10m = DataLoaderWeather(full_wind_data)
 
@@ -71,24 +71,15 @@ for i in horizon:
 
     pandas2ri.activate()
     robjects.globalenv['wind_10m_data_fcsth_i_train_r'] = wind_10m_data_fcsth_i_train
-    if i == 48:
-        robjects.r('''
-                   f <- function(wind_10m_data_fcsth_i_train) {
-    
-                            library(crch)
-                            train1.crch <- crch(obs ~ ens_mean|ens_sd, data = wind_10m_data_fcsth_i_train_r, dist = "gaussian", left = 11, truncated = TRUE, type = "crps", link.scale = "log")
-    
-                    }
-                    ''')
-    else:
-        robjects.r('''
-                   f <- function(wind_10m_data_fcsth_i_train) {
 
-                            library(crch)
-                            train1.crch <- crch(obs ~ ens_mean|ens_sd, data = wind_10m_data_fcsth_i_train_r, dist = "gaussian", left = 0, truncated = TRUE, type = "crps", link.scale = "log")
+    robjects.r('''
+                f <- function(wind_10m_data_fcsth_i_train) {
 
-                    }
-                    ''')
+                        library(crch)
+                        train1.crch <- crch(obs ~ ens_mean|ens_sd, data = wind_10m_data_fcsth_i_train_r, dist = "gaussian", left = 0, truncated = TRUE, type = "crps", link.scale = "log")
+
+                }
+                ''')
     r_f = robjects.globalenv['f']
     rf_model = (r_f(wind_10m_data_fcsth_i_train_r))
     res = pandas2ri.rpy2py(rf_model)
