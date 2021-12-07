@@ -11,8 +11,8 @@ from rpy2.robjects import pandas2ri
 from scipy.stats import norm
 from rpy2.robjects.conversion import localconverter
 from datetime import datetime,timedelta
-from Dataloader_weather import DataUpdaterWeather, DataLoaderWeather, RealObservationsAdder
-# from skgarden import RandomForestQuantileRegressor
+from Dataloader_weather import DataUpdaterWeather, DataLoaderWeather
+from skgarden import RandomForestQuantileRegressor
 """
 In the following we first set up the rpy2 framework in order to be able to use R packages afterwards
 """
@@ -32,7 +32,7 @@ xfun = importr('xfun')
 scoringRules = rpackages.importr('scoringRules')
 crch = rpackages.importr('crch')
 """ load weather data """
-full_weather_data = DataUpdaterWeather('2021-11-17')
+full_weather_data = DataUpdaterWeather('2021-12-01')
 
 df_aswdir_s, df_clct, df_mslp, df_t_2m, df_wind_10m = DataLoaderWeather(full_weather_data)
 #df_t_2m = df_t_2m.dropna()
@@ -168,7 +168,8 @@ estimated_params[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros(len(estim
 
 for i in horizon:
     t2m_data_fcsth_i = df_t_2m[(df_t_2m['fcst_hour'] == i)]
-    t2m_data_fcsth_i = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'].dt.month.isin([10,11,12])]
+    #t2m_data_fcsth_i = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'].dt.month.isin([10,11,12])]
+
     #t2m_data_fcsth_i = t2m_data_fcsth_i.dropna()
     # t2m_data_fcsth48 = t2m_data_fcsth48.set_index(t2m_data_fcsth48['init_tm'])
     # t2m_data_fcsth_i_train = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'] <= '2020-10-24']
@@ -234,6 +235,14 @@ for i in horizon:
 
     #scipy.stats.norm(loc=prediction_mu, scale=prediction_sd).ppf(0.025)
 estimated_params[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/temp_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
-
+print('b')
 
 """ quantile random forests """
+
+rfqr = RandomForestQuantileRegressor(
+    random_state=0, min_samples_split=10, n_estimators=1000)
+X_train = pd.concat([df_t_2m['ens_mean'][:-1], df_t_2m['obs'][:-1]], axis=1)
+X_train = X_train.dropna()
+rfqr_fit = rfqr.fit(X_train['ens_mean'].array.reshape(-1,1) , X_train['obs'].values.ravel())
+print('a')
+rfqr_pred = rfqr.predict(df_t_2m['ens_mean'][len(df_t_2m)-1], quantile=98.5)

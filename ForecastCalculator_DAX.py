@@ -201,13 +201,14 @@ mat_len_train_dat = [30, 120, 182, 365, 730]
 # list(permutations([0, 1, 2], 2))[0][0]
 mean_quantile_scores_diff_length = pd.DataFrame(np.zeros((len(mat_len_train_dat),2)), columns = ['days_train_data', 'mean_quantile_score'] )
 ind = 0
-for days in mat_len_train_dat:
-    mean_quantile_scores = GarchFitter(rets, days)
-    mean_quantile_scores_diff_length['days_train_data'].iloc[ind] = days
-    mean_quantile_scores_diff_length['mean_quantile_score'].iloc[ind] = mean_quantile_scores[mean_quantile_scores['description_type_of_mean'] == 'quantile_score_overall']['mean']
-    ind = ind + 1
+# for days in mat_len_train_dat:
+#     mean_quantile_scores = GarchFitter(rets, days)
+#     mean_quantile_scores_diff_length['days_train_data'].iloc[ind] = days
+#     mean_quantile_scores_diff_length['mean_quantile_score'].iloc[ind] = mean_quantile_scores[mean_quantile_scores['description_type_of_mean'] == 'quantile_score_overall']['mean']
+#     ind = ind + 1
 
-len_train_dat = mean_quantile_scores_diff_length['days_train_data'][mean_quantile_scores_diff_length['mean_quantile_score'] == mean_quantile_scores_diff_length['mean_quantile_score'].min()].values[0]
+#len_train_dat = mean_quantile_scores_diff_length['days_train_data'][mean_quantile_scores_diff_length['mean_quantile_score'] == mean_quantile_scores_diff_length['mean_quantile_score'].min()].values[0]
+len_train_dat = 730
 """
 Findings: q0.025 and q0.975 have a worse quantile score compared to the other quantile levels -> find out why 
 (maybe because of specific time where forecasts were completely wrong and weights for these quantiles larger, or assumption of normal distribution not good)
@@ -248,7 +249,7 @@ for i in range(1, 6):
         percentile_q = norm(loc=df_forecasts['mean_fcst_' + str(i)].iloc[0], scale=np.sqrt(df_forecasts['var_fcst_' + str(i)].iloc[0])).ppf(q)
         estimated_params[str(i)][estimated_params['quantile'] == str(q)] = percentile_q
 
-#estimated_params.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/DAX_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+estimated_params.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/DAX_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
 # evaluate with crps
 # scoringRules = rpackages.importr('scoringRules')
 # crps_fun = scoringRules.crps

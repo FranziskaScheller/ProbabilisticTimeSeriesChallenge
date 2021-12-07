@@ -30,7 +30,7 @@ xfun = importr('xfun')
 scoringRules = rpackages.importr('scoringRules')
 crch = rpackages.importr('crch')
 """ load wind data """
-full_wind_data = DataUpdaterWeather('2021-11-17')
+full_wind_data = DataUpdaterWeather('2021-12-01')
 
 df_aswdir_s, df_clct, df_mslp, df_t_2m, df_wind_10m = DataLoaderWeather(full_wind_data)
 
@@ -52,6 +52,7 @@ for year in df_wind_10m['obs_tm_h'].dt.year.unique():
 df_wind_10m['ens_mean'] = df_wind_10m[["ens_" + str(i) for i in range(1, 41)]].mean(axis=1)
 df_wind_10m['ens_var'] = df_wind_10m[["ens_" + str(i) for i in range(1, 41)]].var(axis=1)
 df_wind_10m['ens_sd'] = np.sqrt(df_wind_10m['ens_var'])
+df_wind_10m['init_tm'] = df_wind_10m['init_tm'].apply(lambda x: datetime.strptime(x,'%Y-%m-%d'))
 
 horizon = [36, 48, 60, 72, 84]
 estimated_params = pd.DataFrame(horizon, columns=['horizon'])
@@ -61,7 +62,7 @@ estimated_params['crps'] = np.zeros(len(estimated_params))
 estimated_params[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros(len(estimated_params))
 for i in horizon:
     wind_10m_data_fcsth_i = df_wind_10m[(df_wind_10m['fcst_hour'] == i)]
-
+    wind_10m_data_fcsth_i = wind_10m_data_fcsth_i[wind_10m_data_fcsth_i['init_tm'].dt.month.isin([10, 11, 12])]
     wind_10m_data_fcsth_i_train = wind_10m_data_fcsth_i[['ens_mean', 'ens_sd', 'obs']].iloc[0:len(wind_10m_data_fcsth_i) - 1]
     wind_10m_data_fcsth_i_test = wind_10m_data_fcsth_i[['ens_mean', 'ens_sd']].iloc[-1:]
 
