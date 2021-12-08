@@ -239,6 +239,73 @@ print('b')
 
 """ quantile random forests """
 
+# import matplotlib.pyplot as plt
+# import numpy as np
+# from sklearn.datasets import load_boston
+# from sklearn.model_selection import train_test_split
+# from sklearn.model_selection import KFold
+# from skgarden import RandomForestQuantileRegressor
+#
+# boston = load_boston()
+# X, y = boston.data, boston.target
+# kf = KFold(n_splits=5)
+# rfqr = RandomForestQuantileRegressor(
+#     random_state=0, min_samples_split=10, n_estimators=1000)
+#
+# y_true_all = []
+# lower = []
+# upper = []
+#
+# for train_index, test_index in kf.split(X):
+#     X_train, X_test, y_train, y_test = (
+#         X[train_index], X[test_index], y[train_index], y[test_index])
+#
+#     rfqr.set_params(max_features=X_train.shape[1] // 3)
+#     rfqr.fit(X_train, y_train)
+#     y_true_all = np.concatenate((y_true_all, y_test))
+#     upper = np.concatenate((upper, rfqr.predict(X_test, quantile=98.5)))
+#     lower = np.concatenate((lower, rfqr.predict(X_test, quantile=2.5)))
+#
+# interval = upper - lower
+# sort_ind = np.argsort(interval)
+# y_true_all = y_true_all[sort_ind]
+# upper = upper[sort_ind]
+# lower = lower[sort_ind]
+# mean = (upper + lower) / 2
+
+#
+#GBM
+from sklearn.ensemble import GradientBoostingRegressor
+
+def GBM(q):
+    # (a) Modeling
+    mod = GradientBoostingRegressor(loss='quantile', alpha=q,
+                                    n_estimators=100, max_depth=5,
+                                    learning_rate=.01, min_samples_leaf=20,
+                                    min_samples_split=20)
+    mod.fit(X_train, y_train)
+    #mod.fit(X_train['ens_mean'].array.reshape(-1,1), X_train['obs'].array.reshape(-1,1))
+
+    # (b) Predictions
+    pred = mod.predict(X_test.array.reshape(1, -1))
+    return pred
+
+estimated_quantiles = pd.DataFrame(horizon, columns=['horizon'])
+estimated_quantiles[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros(len(estimated_params))
+
+for i in horizon:
+    Data_h_i = df_t_2m[(df_t_2m['fcst_hour'] == i)]
+    Data_h_i = Data_h_i.reset_index()
+    Data_h_i = Data_h_i.drop(columns = ['index', 'init_tm','init_tm_dt','obs_tm','obs_tm_h','met_var', 'ens_sd'])
+    X_y_train = Data_h_i[:-1]
+    X_y_train = X_y_train.dropna()
+    X_test = Data_h_i.drop(columns = ['obs']).iloc[len(Data_h_i)-1]
+    y_train = X_y_train['obs']
+    X_train = X_y_train.drop(columns = ['obs'])
+
+    for q in quantile_levels:
+        estimated_quantiles[str(q)][estimated_quantiles['horizon'] == i] = GBM(q)
+
 rfqr = RandomForestQuantileRegressor(
     random_state=0, min_samples_split=10, n_estimators=1000)
 X_train = pd.concat([df_t_2m['ens_mean'][:-1], df_t_2m['obs'][:-1]], axis=1)
