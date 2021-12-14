@@ -22,13 +22,11 @@ if len(names_to_install) > 0:
 #query_hour = datetime(2014, 3, 22, 12)
 #result = dwd.query(station_id='04177', timestamp=query_hour)
 
-
-# Import data
-
 def DataLoaderHistWeather():
     """
-    Function that loads icon_eps_data from RData in DataFrame and saves result in csv file
-    No inputs, nothing that is returned
+    Function that loads icon_eps_data from RData in DataFrame for variables specified in WEATHER_VARS, saves result in
+    csv file and returns dataframe
+    :return: df (Dataframe) with icon_eps_Rdata
     """
     WEATHER_VARS = ["aswdir_s", "clct", "mslp", "t_2m", "wind_10m"]
     ENS_COLS = ["ens_" + str(i) for i in range(1, 41)] + ["ens_mean", "ens_var"]
@@ -44,42 +42,41 @@ def DataLoaderHistWeather():
 
             df[numeric_cols] = df[numeric_cols].astype(np.float32)
             df["fcst_hour"] = df["fcst_hour"].astype(np.int32)
-
-            df["init_tm"] = df["init_tm"].dt.date
-            df["obs_tm"] = df["obs_tm"].dt.date
+            #df["init_tm"] = df["init_tm"].dt.date
+            #df["obs_tm"] = df["obs_tm"].dt.date
 
             data.append(df)
 
     df = pd.concat(data, join='inner')
 
-    df.to_csv('/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_R_data.csv', index = False)
+    df.to_csv('/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_R_data.csv', index=False)
 
-    return
+    return df
 
-def DataUpdaterWeather(last_wednesday):
+def DataUpdaterWeather(update_date):
+
     """
-    Function for updating icon_eps_weather_data with two functionalities
-    1. Updates RData by appending new ensemble forecasts (from October onwards) and saves updated data as csv file twice:
-    - once as icon_eps_weather_R_data_updated.csv in order to have one file that contains all data available so far
-        as one data source (and also backup data if something gets overwritten) since the older ensemble weather forecasts may be deleted from git repo (function only executed once in beginning of challenge)
-    - once as icon_eps_weather_full.csv which will be the file that is regularly appended by new ensemble forecasts
-    2. Appends new ensemble forecasts from txt files from git to icon_eps_weather_full.csv
-    :param update_only_R_data: Indicator function indicating if only RData is updated (=True) or existing data is appended by new forecasts (=False)
-    :return: Nothing (but updated data files are saves as csv files)
+    Function for updating icon_eps_weather_data with new ensemble forecasts from git repository
+    :param update_date: (str) Date of ensemble forecasts which are appended to icon_eps_weather_R_data
+    :return: data_updated (DataFrame) which contains icon_eps_weather_R_data and ensemble forecasts from update_date
+    for all weather variables contained in icon_eps_weather_R_data
     """
-    DataLoaderHistWeather()
-    df = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_R_data.csv')
-    last_wednesday = datetime.strptime(last_wednesday, '%Y-%m-%d')
+    df = DataLoaderHistWeather()
+    update_date = datetime.strptime(update_date, '%Y-%m-%d')
 
-    new_weather_forecasts = DataPreparer(last_wednesday)
-    data_full = df.append(new_weather_forecasts)
-    data_full['init_tm_dt'] = data_full['init_tm'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d'))
-    data_full['obs_tm_h'] = data_full['init_tm_dt'] + pd.to_timedelta(data_full['fcst_hour'], 'h')
-    data_full.to_csv('/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv', index = False)
+    new_weather_forecasts = DataPreparer(update_date)
+    new_weather_forecasts['init_tm'] = new_weather_forecasts['init_tm'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d'))
+    data_updated = df.append(new_weather_forecasts).reset_index().drop(columns=['index'])
+    data_updated.to_csv('/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv', index = False)
 
-    return data_full
+    return data_updated
 
 def DataLoaderWeather(df):
+    """
+    Function that splits the data from a large dataframe df into several smaller data frames based on the met_var column
+    :param df: (DataFrame) containing a column 'met_var' with the values 'aswdir_s', 'clct', 'mslp', 't_2m', 'wind_10m'
+    :return: 5 DataFrames, where each contains only the data from df for a specific met. variable met_var
+    """
 
     df_aswdir_s = df[df['met_var'] == 'aswdir_s'].reset_index()
     df_aswdir_s.drop(['index'], axis=1, inplace=True)
@@ -93,6 +90,10 @@ def DataLoaderWeather(df):
     df_wind_10m.drop(['index'], axis=1, inplace=True)
 
     return df_aswdir_s, df_clct, df_mslp, df_t_2m, df_wind_10m
+
+"""
+Functions that have been used for Karlsruhe weather data for adding all ensemble forecasts and all real observations 
+"""
 
 def RealObservationsAdder(file_path_data_full, file_path_for_update, variable_indicator):
     real_obs = pd.read_csv(file_path_for_update, sep=';')
