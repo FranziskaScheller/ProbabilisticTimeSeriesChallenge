@@ -187,18 +187,19 @@ estimated_params['crps'] = np.zeros(len(estimated_params))
 estimated_params[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros(len(estimated_params))
 
 for i in horizon:
-    # t2m_data_fcsth_i = df_t_2m_mod[(df_t_2m_mod['fcst_hour'] == i)]
-    # #t2m_data_fcsth_i = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'].dt.month.isin([10,11,12])]
-    #
-    # t2m_data_fcsth_i_train = t2m_data_fcsth_i[['ens_mean_t_2m', 'ens_sd_t_2m', 'obs']].iloc[0:len(t2m_data_fcsth_i) - 1]
-    # t2m_data_fcsth_i_test = t2m_data_fcsth_i[['ens_mean_t_2m', 'ens_sd_t_2m']].iloc[-1:]
-
     t2m_data_fcsth_i = df_t_2m[(df_t_2m['fcst_hour'] == i)]
     #t2m_data_fcsth_i = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'].dt.month.isin([10,11,12])]
+
+    #t2m_data_fcsth_i = t2m_data_fcsth_i.dropna()
+    # t2m_data_fcsth48 = t2m_data_fcsth48.set_index(t2m_data_fcsth48['init_tm'])
+    # t2m_data_fcsth_i_train = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'] <= '2020-10-24']
+    # t2m_data_fcsth_i_test = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'] > '2020-10-24']
 
     t2m_data_fcsth_i_train = t2m_data_fcsth_i[['ens_mean', 'ens_sd', 'obs']].iloc[0:len(t2m_data_fcsth_i) - 1]
     t2m_data_fcsth_i_test = t2m_data_fcsth_i[['ens_mean', 'ens_sd']].iloc[-1:]
 
+    # t2m_data_fcsth48[(t2m_data_fcsth48.isnull().values) == True]
+    # t2m_data_fcsth48.rolling(7)
     with localconverter(robjects.default_converter + pandas2ri.converter):
         t2m_data_fcsth_i_train_r = robjects.conversion.py2rpy(t2m_data_fcsth_i_train)
         t2m_data_fcsth_i_test_r = robjects.conversion.py2rpy(t2m_data_fcsth_i_test)
@@ -234,6 +235,13 @@ for i in horizon:
     r_h = robjects.globalenv['h']
     prediction_mu = (r_g(rf_model, t2m_data_fcsth_i_test_r)).values
     prediction_sd = (r_h(rf_model, t2m_data_fcsth_i_test_r)).values
+#    crps_fun = scoringRules.crps
+#    r_float = robjects.vectors.FloatVector
+#    y_true_r = r_float(t2m_data_fcsth_i_test['obs'])
+#    mu_r = r_float(prediction_mu)
+#    sigma_r = r_float(prediction_sd)
+#    score = scoringRules.crps(y_true_r, mean=mu_r, sd=sigma_r, family="normal")
+    #    mean_crps_score = np.array(score).mean()
 
     estimated_params['mu'][estimated_params['horizon'] == i] = prediction_mu
     estimated_params['sd'][estimated_params['horizon'] == i] = prediction_sd
