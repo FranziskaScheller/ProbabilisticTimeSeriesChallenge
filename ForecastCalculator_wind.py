@@ -30,7 +30,7 @@ xfun = importr('xfun')
 scoringRules = rpackages.importr('scoringRules')
 crch = rpackages.importr('crch')
 """ load wind data """
-full_wind_data = DataUpdaterWeather('2021-12-01')
+full_wind_data = DataUpdaterWeather('2021-12-08')
 
 df_aswdir_s, df_clct, df_mslp, df_t_2m, df_wind_10m = DataLoaderWeather(full_wind_data)
 
@@ -121,8 +121,71 @@ for i in horizon:
         estimated_params[str(q)][estimated_params['horizon'] == i] = percentile_q
     #scipy.stats.norm(loc=prediction_mu, scale=prediction_sd).ppf(0.025)
 
-estimated_params[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/wind_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
-print(1)
+#estimated_params[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/wind_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+
+""" EMOS and boosting """
+estimated_params_boost_EMOS = pd.DataFrame(horizon, columns=['horizon'])
+estimated_params_boost_EMOS['mu'] = np.zeros(len(estimated_params_boost_EMOS))
+estimated_params_boost_EMOS['sd'] = np.zeros(len(estimated_params_boost_EMOS))
+estimated_params_boost_EMOS[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros(len(estimated_params_boost_EMOS))
+
+for i in horizon:
+    wind_10m_data_fcsth_i = df_wind_10m[(df_wind_10m['fcst_hour'] == i)]
+    wind_10m_data_fcsth_i = wind_10m_data_fcsth_i[wind_10m_data_fcsth_i['init_tm'].dt.month.isin([10, 11, 12])]
+
+    wind_10m_data_fcsth_i_train = wind_10m_data_fcsth_i[['ens_mean', 'ens_sd', 'obs']].iloc[0:len(wind_10m_data_fcsth_i) - 1]
+    wind_10m_data_fcsth_i_test = wind_10m_data_fcsth_i[['ens_mean', 'ens_sd']].iloc[-1:]
+
+    with localconverter(robjects.default_converter + pandas2ri.converter):
+        wind_10m_data_fcsth_i_train_r = robjects.conversion.py2rpy(wind_10m_data_fcsth_i_train)
+        wind_10m_data_fcsth_i_test_r = robjects.conversion.py2rpy(wind_10m_data_fcsth_i_test)
+
+    pandas2ri.activate()
+    robjects.globalenv['wind_10m_data_fcsth_i_train_r'] = wind_10m_data_fcsth_i_train
+    robjects.r('''
+               f <- function(wind_10m_data_fcsth_i_train) {
+
+                        library(crch)
+                        train1.crch <- crch(obs ~ ens_mean|ens_sd, data = wind_10m_data_fcsth_i_train_r, dist = "gaussian", type = "crps", link.scale = "log",control = crch.boost(mstop = "aic"))
+
+                }
+                ''')
+
+    r_f = robjects.globalenv['f']
+    rf_model = (r_f(wind_10m_data_fcsth_i_train_r))
+    res = pandas2ri.rpy2py(rf_model)
+    robjects.r('''
+               g <- function(model,test) {
+
+                        pred_loc <- as.data.frame(predict(model, test, type = "location"))
+
+                }
+
+                h <- function(model,test) {
+
+                        pred_loc <- as.data.frame(predict(model, test, type = "scale"))
+
+                }
+                ''')
+
+    r_g = robjects.globalenv['g']
+    r_h = robjects.globalenv['h']
+    prediction_mu = (r_g(rf_model, wind_10m_data_fcsth_i_test_r)).values
+    prediction_sd = (r_h(rf_model, wind_10m_data_fcsth_i_test_r)).values
+
+    estimated_params_boost_EMOS['mu'][estimated_params_boost_EMOS['horizon'] == i] = prediction_mu
+    estimated_params_boost_EMOS['sd'][estimated_params_boost_EMOS['horizon'] == i] = prediction_sd
+#    estimated_params['crps'][estimated_params['horizon'] == i] = score
+
+    quantile_levels = [0.025, 0.25, 0.5, 0.75, 0.975]
+
+    for q in quantile_levels:
+        percentile_q = norm(loc=estimated_params_boost_EMOS['mu'][estimated_params_boost_EMOS['horizon'] == i], scale=estimated_params_boost_EMOS['sd'][estimated_params_boost_EMOS['horizon'] == i]).ppf(q)
+        estimated_params_boost_EMOS[str(q)][estimated_params_boost_EMOS['horizon'] == i] = percentile_q
+
+    #scipy.stats.norm(loc=prediction_mu, scale=prediction_sd).ppf(0.025)
+estimated_params_boost_EMOS[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/wind_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+
 
 """
 Idea: systematic erros, biases etc more similar when same time of the year so only use this month and the 2 months around it for estimation 

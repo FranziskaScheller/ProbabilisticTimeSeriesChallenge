@@ -32,7 +32,7 @@ xfun = importr('xfun')
 scoringRules = rpackages.importr('scoringRules')
 crch = rpackages.importr('crch')
 """ load weather data """
-full_weather_data = DataUpdaterWeather('2021-12-01')
+full_weather_data = DataUpdaterWeather('2021-12-08')
 
 df_aswdir_s, df_clct, df_mslp, df_t_2m, df_wind_10m = DataLoaderWeather(full_weather_data)
 #df_t_2m = df_t_2m.dropna()
@@ -237,6 +237,91 @@ for i in horizon:
 estimated_params[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/temp_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
 print('b')
 
+""" EMOS and boosting """
+estimated_params_boost_EMOS = pd.DataFrame(horizon, columns=['horizon'])
+estimated_params_boost_EMOS['mu'] = np.zeros(len(estimated_params_boost_EMOS))
+estimated_params_boost_EMOS['sd'] = np.zeros(len(estimated_params_boost_EMOS))
+estimated_params_boost_EMOS[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros(len(estimated_params_boost_EMOS))
+
+for i in horizon:
+    t2m_data_fcsth_i = df_t_2m[(df_t_2m['fcst_hour'] == i)]
+    t2m_data_fcsth_i = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'].dt.month.isin([11,12,1])]
+
+    #t2m_data_fcsth_i = t2m_data_fcsth_i.dropna()
+    # t2m_data_fcsth48 = t2m_data_fcsth48.set_index(t2m_data_fcsth48['init_tm'])
+    # t2m_data_fcsth_i_train = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'] <= '2020-10-24']
+    # t2m_data_fcsth_i_test = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'] > '2020-10-24']
+
+    t2m_data_fcsth_i_train = t2m_data_fcsth_i[['ens_mean', 'ens_sd', 'obs']].iloc[0:len(t2m_data_fcsth_i) - 1]
+    t2m_data_fcsth_i_test = t2m_data_fcsth_i[['ens_mean', 'ens_sd']].iloc[-1:]
+
+    #t2m_data_fcsth_i_train = t2m_data_fcsth_i[['ens_mean', 'ens_sd', 'obs']].iloc[0:len(t2m_data_fcsth_i) - 1]
+    #t2m_data_fcsth_i_test = t2m_data_fcsth_i[['ens_mean', 'ens_sd']].iloc[-1:]
+
+    # t2m_data_fcsth48[(t2m_data_fcsth48.isnull().values) == True]
+    # t2m_data_fcsth48.rolling(7)
+    with localconverter(robjects.default_converter + pandas2ri.converter):
+        t2m_data_fcsth_i_train_r = robjects.conversion.py2rpy(t2m_data_fcsth_i_train)
+        t2m_data_fcsth_i_test_r = robjects.conversion.py2rpy(t2m_data_fcsth_i_test)
+
+    pandas2ri.activate()
+    robjects.globalenv['t2m_data_fcsth_i_train_r'] = t2m_data_fcsth_i_train
+    robjects.r('''
+               f <- function(t2m_data_fcsth_i_train) {
+
+                        library(crch)
+                        train1.crch <- crch(obs ~ ens_mean|ens_sd, data = t2m_data_fcsth_i_train_r, dist = "gaussian", type = "crps", link.scale = "log",control = crch.boost(mstop = "aic"))
+
+                }
+                ''')
+    # crch.boost(maxit=100, nu=0.1, start=NULL, dot="separate",
+    #            mstop=c("max", "aic", "bic", "cv"), nfolds=10, foldid=NULL,
+    #            maxvar=NULL)
+    # train1.crch < - crch.boost.fit(obs
+    # ~ ens_mean | ens_sd, dist = "gaussian", type = "crps", link.scale = "log")
+
+    r_f = robjects.globalenv['f']
+    rf_model = (r_f(t2m_data_fcsth_i_train_r))
+    res = pandas2ri.rpy2py(rf_model)
+    robjects.r('''
+               g <- function(model,test) {
+
+                        pred_loc <- as.data.frame(predict(model, test, type = "location"))
+
+                }
+
+                h <- function(model,test) {
+
+                        pred_loc <- as.data.frame(predict(model, test, type = "scale"))
+
+                }
+                ''')
+
+    r_g = robjects.globalenv['g']
+    r_h = robjects.globalenv['h']
+    prediction_mu = (r_g(rf_model, t2m_data_fcsth_i_test_r)).values
+    prediction_sd = (r_h(rf_model, t2m_data_fcsth_i_test_r)).values
+#    crps_fun = scoringRules.crps
+#    r_float = robjects.vectors.FloatVector
+#    y_true_r = r_float(t2m_data_fcsth_i_test['obs'])
+#    mu_r = r_float(prediction_mu)
+#    sigma_r = r_float(prediction_sd)
+#    score = scoringRules.crps(y_true_r, mean=mu_r, sd=sigma_r, family="normal")
+    #    mean_crps_score = np.array(score).mean()
+
+    estimated_params_boost_EMOS['mu'][estimated_params_boost_EMOS['horizon'] == i] = prediction_mu
+    estimated_params_boost_EMOS['sd'][estimated_params_boost_EMOS['horizon'] == i] = prediction_sd
+#    estimated_params['crps'][estimated_params['horizon'] == i] = score
+
+    quantile_levels = [0.025, 0.25, 0.5, 0.75, 0.975]
+
+    for q in quantile_levels:
+        percentile_q = norm(loc=estimated_params_boost_EMOS['mu'][estimated_params_boost_EMOS['horizon'] == i], scale=estimated_params_boost_EMOS['sd'][estimated_params_boost_EMOS['horizon'] == i]).ppf(q)
+        estimated_params_boost_EMOS[str(q)][estimated_params_boost_EMOS['horizon'] == i] = percentile_q
+
+    #scipy.stats.norm(loc=prediction_mu, scale=prediction_sd).ppf(0.025)
+estimated_params_boost_EMOS[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/temp_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+
 """ quantile random forests """
 
 # import matplotlib.pyplot as plt
@@ -280,9 +365,9 @@ from sklearn.ensemble import GradientBoostingRegressor
 def GBM(q):
     # (a) Modeling
     mod = GradientBoostingRegressor(loss='quantile', alpha=q,
-                                    n_estimators=100, max_depth=5,
-                                    learning_rate=.01, min_samples_leaf=20,
-                                    min_samples_split=20)
+                                    n_estimators=10, max_depth=5,
+                                    learning_rate=.01, min_samples_leaf=10,
+                                    min_samples_split=10)
     mod.fit(X_train, y_train)
     #mod.fit(X_train['ens_mean'].array.reshape(-1,1), X_train['obs'].array.reshape(-1,1))
 
@@ -296,7 +381,7 @@ estimated_quantiles[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros(len(es
 for i in horizon:
     Data_h_i = df_t_2m[(df_t_2m['fcst_hour'] == i)]
     Data_h_i = Data_h_i.reset_index()
-    Data_h_i = Data_h_i.drop(columns = ['index', 'init_tm','init_tm_dt','obs_tm','obs_tm_h','met_var', 'ens_sd'])
+    Data_h_i = Data_h_i.drop(columns = ['index', 'init_tm','init_tm_dt','obs_tm','obs_tm_h','met_var', 'ens_sd', 'ens_mean', 'ens_var', 'fcst_hour'])
     X_y_train = Data_h_i[:-1]
     X_y_train = X_y_train.dropna()
     X_test = Data_h_i.drop(columns = ['obs']).iloc[len(Data_h_i)-1]
