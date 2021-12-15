@@ -12,6 +12,7 @@ from Dataloader_weather import DataUpdaterWeather, DataLoaderWeather
 from skgarden import RandomForestQuantileRegressor
 from scipy.stats import norm, kurtosis
 from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.metrics import mean_pinball_loss
 
 """
 In the following we first set up the rpy2 framework in order to be able to use R packages afterwards
@@ -38,8 +39,8 @@ crch = rpackages.importr('crch')
 load weather data 
 """
 # load data frame weather_data with r_icon_eps weather data and ensemble forecasts from 'YYYY-MM-DD'
-weather_data = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'))
-#weather_data = DataUpdaterWeather('2021-12-08')
+#weather_data = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'))
+weather_data = DataUpdaterWeather('2021-12-08')
 
 # for each variable add the ensemble mean and standard deviation
 weather_data['ens_mean'] = weather_data[["ens_" + str(i) for i in range(1, 41)]].mean(axis=1)
@@ -372,28 +373,72 @@ for i in horizon:
 """
 Functions for rolling window approach 
 """
-length_test_data = 1
-index_drop_na = False
-def RollingWindowQuantileCalculator(data, length_train_data, length_test_data, index_drop_na, horizon):
 
+def RollingWindowQuantileCalculator(data, length_train_data, index_drop_na, horizon_i):
+
+    data = data[(data['fcst_hour'] == horizon_i)]
     if index_drop_na == True:
         data = data.dropna()
 
     data = data.reset_index()
-    data = data.drop(columns = ['index'])
+    data = data.drop(columns='index')
     len_data = len(data)
     len_preds = len_data - length_train_data
+
     # Dataframe that contains quantile predictions for the different horizons and test data times
-    quantile_preds_rw = pd.DataFrame((np.zeros(len_preds * len(horizon), 2)), columns=['horizon', 'init_tm'])
-    quantile_preds_rw[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros(len_preds * len(horizon))
+    quantile_preds_rw = pd.DataFrame(data[['init_tm', 'obs_tm']].iloc[length_train_data:len_data-1] , columns=['init_tm','obs_tm'])
+    quantile_preds_rw['horizon'] = horizon_i
+    quantile_preds_rw[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros((len_preds-1, 5))
 
+    quantile_preds_rw = quantile_preds_rw.reset_index()
+    quantile_preds_rw = quantile_preds_rw.drop(columns='index')
 
+    for i in range(0, len_preds - 1):
+        X_y_train = data.iloc[i:i+length_train_data]
+        X_train = X_y_train.drop(columns='obs')
+        y_train = X_y_train['obs']
+        time = data['init_tm'].iloc[i + length_train_data]
+        X_test = data.drop(columns=['obs', 'init_tm', 'fcst_hour', 'obs_tm']).iloc[i + length_train_data]
 
+        for q in quantile_levels:
+            quantile_preds_rw[str(q)][quantile_preds_rw['init_tm'] == time] = GBM(q, X_train.drop(columns=['init_tm', 'fcst_hour', 'obs_tm']), y_train, X_test)
 
-    return
+    return quantile_preds_rw
 
-RollingWindowQuantileCalculator(df_t_2m_mod, 365, length_test_data, index_drop_na, horizon)
+index_drop_na = True
+# quantile_preds_rw = RollingWindowQuantileCalculator(df_t_2m_mod, 365, index_drop_na, 36)
+#quantile_preds_rw = RollingWindowQuantileCalculator(df_t_2m_mod, 800, index_drop_na, 36)
 
+ind = 1
+for h in horizon:
+    if ind == 1:
+        quantile_preds_rw = RollingWindowQuantileCalculator(df_t_2m_mod, 820, index_drop_na, h)
+    else:
+        quantile_preds_rw_i = RollingWindowQuantileCalculator(df_t_2m_mod, 820, index_drop_na, h)
+        quantile_preds_rw = quantile_preds_rw.append(quantile_preds_rw_i)
+
+    ind = ind + 1
+
+def QuantilePredictionEvaluator(predictions, quantile_levels, horizons):
+    avg_pinball_loss = pd.DataFrame(horizons, columns=['horizon'])
+    avg_pinball_loss[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros(len(avg_pinball_loss))
+
+    for q in quantile_levels:
+        for h in horizons:
+            avg_pinball_loss[str(q)][avg_pinball_loss['horizon'] == h] = mean_pinball_loss(predictions['obs'][predictions['horizon'] == h], predictions[str(q)][predictions['horizon'] == h], alpha=q)
+
+    avg_pinball_loss['avg_per_horizon'] = avg_pinball_loss[['0.025', '0.25', '0.5', '0.75', '0.975']].mean(axis = 1)
+    avg_pinball_loss_per_quantile = avg_pinball_loss[['0.025', '0.25', '0.5', '0.75', '0.975']].mean(axis = 0)
+    avg_pinball_loss_overall = avg_pinball_loss_per_quantile.mean()
+    return avg_pinball_loss, avg_pinball_loss_per_quantile, avg_pinball_loss_overall
+
+quantile_preds_rw = quantile_preds_rw.merge(df_t_2m_mod[['obs', 'init_tm', 'obs_tm']], on = ['init_tm', 'obs_tm'], how = 'left', validate = '1:1')
+
+avg_pinball_loss, avg_pinball_loss_per_quantile, avg_pinball_loss_overall = QuantilePredictionEvaluator(quantile_preds_rw, quantile_levels = [0.025, 0.25, 0.5, 0.75, 0.975], horizons = horizon)
+
+"""
+Grid search of parameters with rolling window evaluation 
+"""
 
 rfqr = RandomForestQuantileRegressor(
     random_state=0, min_samples_split=10, n_estimators=1000)
