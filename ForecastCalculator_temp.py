@@ -39,6 +39,8 @@ load weather data
 """
 # load data frame weather_data with r_icon_eps weather data and ensemble forecasts from 'YYYY-MM-DD'
 weather_data = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'))
+#weather_data = DataUpdaterWeather('2021-12-08')
+
 # for each variable add the ensemble mean and standard deviation
 weather_data['ens_mean'] = weather_data[["ens_" + str(i) for i in range(1, 41)]].mean(axis=1)
 weather_data['ens_sd'] = weather_data[["ens_" + str(i) for i in range(1, 41)]].std(axis=1)
@@ -46,7 +48,10 @@ weather_data['ens_sd'] = weather_data[["ens_" + str(i) for i in range(1, 41)]].s
 # split large weather_data DataFrame in smaller DataFrames for the different weather variables
 df_aswdir_s, df_clct, df_mslp, df_t_2m, df_wind_10m = DataLoaderWeather(weather_data)
 
+# add month and year as variables since temperature depends heavily on the month of the year
+# and possibly a bit on the year itself due to climate change
 df_t_2m['month'] = df_t_2m['obs_tm'].apply(lambda x: x.to_pydatetime().month)
+df_t_2m['year'] = df_t_2m['obs_tm'].apply(lambda x: x.to_pydatetime().year)
 
 df_t_2m_mod = df_t_2m[['init_tm', 'fcst_hour', 'obs_tm', 'obs', 'ens_mean', 'ens_sd', 'month']]
 df_t_2m_mod = df_t_2m_mod.rename(columns={'ens_mean': 'ens_mean_t_2m', 'ens_sd': 'ens_sd_t_2m'})
@@ -190,11 +195,6 @@ for i in horizon:
     t2m_data_fcsth_i = df_t_2m[(df_t_2m['fcst_hour'] == i)]
     #t2m_data_fcsth_i = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'].dt.month.isin([10,11,12])]
 
-    #t2m_data_fcsth_i = t2m_data_fcsth_i.dropna()
-    # t2m_data_fcsth48 = t2m_data_fcsth48.set_index(t2m_data_fcsth48['init_tm'])
-    # t2m_data_fcsth_i_train = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'] <= '2020-10-24']
-    # t2m_data_fcsth_i_test = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'] > '2020-10-24']
-
     t2m_data_fcsth_i_train = t2m_data_fcsth_i[['ens_mean', 'ens_sd', 'obs']].iloc[0:len(t2m_data_fcsth_i) - 1]
     t2m_data_fcsth_i_test = t2m_data_fcsth_i[['ens_mean', 'ens_sd']].iloc[-1:]
 
@@ -268,11 +268,6 @@ for i in horizon:
     t2m_data_fcsth_i = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'].apply(lambda x: x.to_pydatetime().month).isin([11,12,1])]
     #t2m_data_fcsth_i = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'].dt.month.isin([11,12,1])]
 
-    #t2m_data_fcsth_i = t2m_data_fcsth_i.dropna()
-    # t2m_data_fcsth48 = t2m_data_fcsth48.set_index(t2m_data_fcsth48['init_tm'])
-    # t2m_data_fcsth_i_train = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'] <= '2020-10-24']
-    # t2m_data_fcsth_i_test = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'] > '2020-10-24']
-
     t2m_data_fcsth_i_train = t2m_data_fcsth_i[['ens_mean', 'ens_sd', 'obs']].iloc[0:len(t2m_data_fcsth_i) - 1]
     t2m_data_fcsth_i_test = t2m_data_fcsth_i[['ens_mean', 'ens_sd']].iloc[-1:]
 
@@ -345,17 +340,15 @@ estimated_params_boost_EMOS[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/
 
 """ Quantile Gradient Boosting """
 
-"""
-Create data set for Boosting
-"""
-
-
-
 def GBM(q, X_train, y_train, X_test):
     mod = GradientBoostingRegressor(loss='quantile', alpha=q,
-                                    n_estimators=10, max_depth=5,
+                                    n_estimators=15, max_depth=8,
                                     learning_rate=.01, min_samples_leaf=10,
-                                    min_samples_split=10)
+                                    min_samples_split=15)
+    # mod = GradientBoostingRegressor(loss='quantile', alpha=q,
+    #                                 n_estimators=10, max_depth=5,
+    #                                 learning_rate=.01, min_samples_leaf=10,
+    #                                 min_samples_split=10)
     mod.fit(X_train, y_train)
     pred = mod.predict(X_test.array.reshape(1, -1))
     return pred
@@ -364,9 +357,9 @@ estimated_quantiles = pd.DataFrame(horizon, columns=['horizon'])
 estimated_quantiles[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros(len(estimated_params))
 
 for i in horizon:
-    temp_data_boosting_i = temp_data_boosting[(temp_data_boosting['fcst_hour'].isin([i, i + 1, i - 1]))]
+    temp_data_boosting_i = df_t_2m_mod[(df_t_2m_mod['fcst_hour'].isin([i, i + 1, i - 1, i + 2, i - 2, i + 3, i - 3, i + 4, i - 4]))]
     temp_data_boosting_i = temp_data_boosting_i.reset_index()
-    temp_data_boosting_i = temp_data_boosting_i.drop(columns = ['index', 'init_tm', 'obs_tm'])
+    temp_data_boosting_i = temp_data_boosting_i.drop(columns=['index', 'init_tm', 'obs_tm'])
     X_y_train = temp_data_boosting_i[:-1]
     X_y_train = X_y_train.dropna()
     X_test = temp_data_boosting_i.drop(columns=['obs']).iloc[len(temp_data_boosting_i)-1]
@@ -375,6 +368,32 @@ for i in horizon:
 
     for q in quantile_levels:
         estimated_quantiles[str(q)][estimated_quantiles['horizon'] == i] = GBM(q, X_train, y_train, X_test)
+
+"""
+Functions for rolling window approach 
+"""
+length_test_data = 1
+index_drop_na = False
+def RollingWindowQuantileCalculator(data, length_train_data, length_test_data, index_drop_na, horizon):
+
+    if index_drop_na == True:
+        data = data.dropna()
+
+    data = data.reset_index()
+    data = data.drop(columns = ['index'])
+    len_data = len(data)
+    len_preds = len_data - length_train_data
+    # Dataframe that contains quantile predictions for the different horizons and test data times
+    quantile_preds_rw = pd.DataFrame((np.zeros(len_preds * len(horizon), 2)), columns=['horizon', 'init_tm'])
+    quantile_preds_rw[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros(len_preds * len(horizon))
+
+
+
+
+    return
+
+RollingWindowQuantileCalculator(df_t_2m_mod, 365, length_test_data, index_drop_na, horizon)
+
 
 rfqr = RandomForestQuantileRegressor(
     random_state=0, min_samples_split=10, n_estimators=1000)
