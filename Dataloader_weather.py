@@ -6,6 +6,7 @@ import rpy2.robjects.packages as rpackages
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+from scipy.stats import kurtosis, iqr, skew
 
 base = importr('base')
 utils = rpackages.importr('utils')
@@ -61,15 +62,58 @@ def DataUpdaterWeather(update_date):
     :return: data_updated (DataFrame) which contains icon_eps_weather_R_data and ensemble forecasts from update_date
     for all weather variables contained in icon_eps_weather_R_data
     """
-    df = DataLoaderHistWeather()
+    hist_weather_ensemble = DataLoaderHistWeather()
     update_date = datetime.strptime(update_date, '%Y-%m-%d')
 
     new_weather_forecasts = DataPreparer(update_date)
     new_weather_forecasts['init_tm'] = new_weather_forecasts['init_tm'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d'))
-    data_updated = df.append(new_weather_forecasts).reset_index().drop(columns=['index'])
-    data_updated.to_csv('/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv', index = False)
+    weather_data = hist_weather_ensemble.append(new_weather_forecasts).reset_index().drop(columns=['index'])
+    weather_data.to_csv('/Users/franziska/Dropbox/DataPTSFC/icon_eps_weather_full.csv', index = False)
 
-    return data_updated
+    # for each variable add the ensemble mean and standard deviation
+    weather_data['ens_mean'] = weather_data[["ens_" + str(i) for i in range(1, 41)]].mean(axis=1)
+    weather_data['ens_sd'] = weather_data[["ens_" + str(i) for i in range(1, 41)]].std(axis=1)
+    weather_data['ens_skewness'] = skew(weather_data[["ens_" + str(i) for i in range(1, 41)]], axis=1)
+    weather_data['ens_kurtosis'] = kurtosis(weather_data[["ens_" + str(i) for i in range(1, 41)]], axis=1)
+    weather_data['ens_iqr_025_075'] = iqr(weather_data[["ens_" + str(i) for i in range(1, 41)]], axis=1)
+    weather_data['ens_iqr_01_09'] = iqr(weather_data[["ens_" + str(i) for i in range(1, 41)]], rng=(10, 90), axis=1)
+    weather_data['ens_iqr_04_06'] = iqr(weather_data[["ens_" + str(i) for i in range(1, 41)]], rng=(40, 60), axis=1)
+    # weather_data['ens_kurtosis'] = weather_data[["ens_" + str(i) for i in range(1, 41)]].apply(lambda x: kurtosis(x))
+    # split large weather_data DataFrame in smaller DataFrames for the different weather variables
+    df_aswdir_s, df_clct, df_mslp, df_t_2m, df_wind_10m = DataLoaderWeather(weather_data)
+
+    # add month and year as variables since temperature depends heavily on the month of the year
+    # and possibly a bit on the year itself due to climate change
+    df_t_2m['month'] = df_t_2m['obs_tm'].apply(lambda x: x.to_pydatetime().month)
+    df_t_2m['year'] = df_t_2m['obs_tm'].apply(lambda x: x.to_pydatetime().year)
+
+    df_t_2m_mod = df_t_2m[
+        ['init_tm', 'fcst_hour', 'obs_tm', 'obs', 'ens_mean', 'ens_sd', 'ens_skewness', 'ens_kurtosis', 'ens_iqr_04_06',
+         'ens_iqr_025_075', 'ens_iqr_01_09', 'month', 'year']]
+    df_t_2m_mod = df_t_2m_mod.rename(
+        columns={'ens_mean': 'ens_mean_t_2m', 'ens_sd': 'ens_sd_t_2m', 'ens_skewness': 'ens_skewness_t_2m',
+                 'ens_kurtosis': 'ens_kurtosis_t_2m', 'ens_iqr_04_06': 'ens_iqr_04_06_t_2m',
+                 'ens_iqr_025_075': 'ens_iqr_025_075_t_2m', 'ens_iqr_01_09': 'ens_iqr_01_09_t_2m'})
+    df_t_2m_mod = df_t_2m_mod.merge(df_clct[['init_tm', 'fcst_hour', 'obs_tm', 'ens_mean', 'ens_sd']],
+                                    how='left', on=['init_tm', 'fcst_hour', 'obs_tm'], validate="1:1")
+    df_t_2m_mod = df_t_2m_mod.rename(
+        columns={'ens_mean': 'ens_mean_clct', 'ens_sd': 'ens_sd_clct', 'ens_skewness': 'ens_skewness_clct',
+                 'ens_kurtosis': 'ens_kurtosis_clct', 'ens_iqr_04_06': 'ens_iqr_04_06_clct',
+                 'ens_iqr_025_075': 'ens_iqr_025_075_clct', 'ens_iqr_01_09': 'ens_iqr_01_09_clct'})
+    df_t_2m_mod = df_t_2m_mod.merge(df_mslp[['init_tm', 'fcst_hour', 'obs_tm', 'ens_mean', 'ens_sd']],
+                                    how='left', on=['init_tm', 'fcst_hour', 'obs_tm'], validate="1:1")
+    df_t_2m_mod = df_t_2m_mod.rename(
+        columns={'ens_mean': 'ens_mean_mslp', 'ens_sd': 'ens_sd_mslp', 'ens_skewness': 'ens_skewness_mslp',
+                 'ens_kurtosis': 'ens_kurtosis_mslp', 'ens_iqr_04_06': 'ens_iqr_04_06_mslp',
+                 'ens_iqr_025_075': 'ens_iqr_025_075_mslp', 'ens_iqr_01_09': 'ens_iqr_01_09_mslp'})
+    df_t_2m_mod = df_t_2m_mod.merge(df_wind_10m[['init_tm', 'fcst_hour', 'obs_tm', 'ens_mean', 'ens_sd']],
+                                    how='left', on=['init_tm', 'fcst_hour', 'obs_tm'], validate="1:1")
+    df_t_2m_mod = df_t_2m_mod.rename(
+        columns={'ens_mean': 'ens_mean_wind_10m', 'ens_sd': 'ens_sd_wind_10m', 'ens_skewness': 'ens_skewness_wind_10m',
+                 'ens_kurtosis': 'ens_kurtosis_wind_10m', 'ens_iqr_04_06': 'ens_iqr_04_06_wind_10m',
+                 'ens_iqr_025_075': 'ens_iqr_025_075_wind_10m', 'ens_iqr_01_09': 'ens_iqr_01_09_wind_10m'})
+
+    return df_t_2m_mod, df_t_2m, df_wind_10m
 
 def DataLoaderWeather(df):
     """
@@ -131,7 +175,7 @@ def DataPreparer(last_wednesday):
     list_variable_names = ["clct", "mslp", "t_2m", "wind_mean_10m"]
     indicator = 0
     for var_name in list_variable_names:
-        file_name = '/Users/franziska/PycharmProjects/ProbabilisticTimeSeriesChallenge/kit-weather-ensemble-point-forecast-berlin/icon-eu-eps_' + str(last_wednesday.strftime("%Y%m%d%H")) + '_' + var_name + '_Berlin.txt'
+        file_name = '/Users/franziska/PycharmProjects/ProbabilisticTimeSeriesChallenge/kit-weather-ensemble-point-forecast-berlin-old/icon-eu-eps_' + str(last_wednesday.strftime("%Y%m%d%H")) + '_' + var_name + '_Berlin.txt'
         data = pd.read_csv(file_name, sep=",", header=None)
         data = data[4:]
         data = data[0].str.split('|', 42, expand=True)

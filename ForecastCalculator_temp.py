@@ -10,7 +10,7 @@ from rpy2.robjects.conversion import localconverter
 from datetime import datetime,timedelta
 from Dataloader_weather import DataUpdaterWeather, DataLoaderWeather
 from skgarden import RandomForestQuantileRegressor
-from scipy.stats import norm, kurtosis
+from scipy.stats import norm, kurtosis, iqr, mode, skew
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.metrics import mean_pinball_loss
 
@@ -40,31 +40,7 @@ load weather data
 """
 # load data frame weather_data with r_icon_eps weather data and ensemble forecasts from 'YYYY-MM-DD'
 #weather_data = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'))
-weather_data = DataUpdaterWeather('2021-12-08')
-
-# for each variable add the ensemble mean and standard deviation
-weather_data['ens_mean'] = weather_data[["ens_" + str(i) for i in range(1, 41)]].mean(axis=1)
-weather_data['ens_sd'] = weather_data[["ens_" + str(i) for i in range(1, 41)]].std(axis=1)
-#weather_data['ens_kurtosis'] = weather_data[["ens_" + str(i) for i in range(1, 41)]].apply(lambda x: kurtosis(x))
-# split large weather_data DataFrame in smaller DataFrames for the different weather variables
-df_aswdir_s, df_clct, df_mslp, df_t_2m, df_wind_10m = DataLoaderWeather(weather_data)
-
-# add month and year as variables since temperature depends heavily on the month of the year
-# and possibly a bit on the year itself due to climate change
-df_t_2m['month'] = df_t_2m['obs_tm'].apply(lambda x: x.to_pydatetime().month)
-df_t_2m['year'] = df_t_2m['obs_tm'].apply(lambda x: x.to_pydatetime().year)
-
-df_t_2m_mod = df_t_2m[['init_tm', 'fcst_hour', 'obs_tm', 'obs', 'ens_mean', 'ens_sd', 'month']]
-df_t_2m_mod = df_t_2m_mod.rename(columns={'ens_mean': 'ens_mean_t_2m', 'ens_sd': 'ens_sd_t_2m'})
-df_t_2m_mod = df_t_2m_mod.merge(df_clct[['init_tm', 'fcst_hour', 'obs_tm', 'ens_mean', 'ens_sd']],
-                                              how='left', on=['init_tm', 'fcst_hour', 'obs_tm'], validate="1:1")
-df_t_2m_mod = df_t_2m_mod.rename(columns={'ens_mean': 'ens_mean_clct', 'ens_sd': 'ens_sd_clct'})
-df_t_2m_mod = df_t_2m_mod.merge(df_mslp[['init_tm', 'fcst_hour', 'obs_tm', 'ens_mean', 'ens_sd']],
-                                              how='left', on=['init_tm', 'fcst_hour', 'obs_tm'], validate="1:1")
-df_t_2m_mod = df_t_2m_mod.rename(columns={'ens_mean': 'ens_mean_mslp', 'ens_sd': 'ens_sd_mslp'})
-df_t_2m_mod = df_t_2m_mod.merge(df_wind_10m[['init_tm', 'fcst_hour', 'obs_tm', 'ens_mean', 'ens_sd']],
-                                              how='left', on=['init_tm', 'fcst_hour', 'obs_tm'], validate="1:1")
-df_t_2m_mod = df_t_2m_mod.rename(columns={'ens_mean': 'ens_mean_wind_10m', 'ens_sd': 'ens_sd_wind_10m'})
+weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather('2021-12-15')
 
 """
 First visualize real temperature observations to get a feeling for the data
@@ -266,7 +242,7 @@ estimated_params_boost_EMOS[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zero
 
 for i in horizon:
     t2m_data_fcsth_i = df_t_2m[(df_t_2m['fcst_hour'] == i)]
-    t2m_data_fcsth_i = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'].apply(lambda x: x.to_pydatetime().month).isin([11,12,1])]
+    t2m_data_fcsth_i = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'].apply(lambda x: x.to_pydatetime().month).isin([11, 12, 1])]
     #t2m_data_fcsth_i = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'].dt.month.isin([11,12,1])]
 
     t2m_data_fcsth_i_train = t2m_data_fcsth_i[['ens_mean', 'ens_sd', 'obs']].iloc[0:len(t2m_data_fcsth_i) - 1]
