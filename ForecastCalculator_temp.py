@@ -222,12 +222,12 @@ estimated_params_boost_EMOS[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/
 QuantileRandomForest Tests
 """
 rfqr = RandomForestQuantileRegressor(
-    random_state=0, min_samples_split=10, n_estimators=1000)
-X_train = pd.concat([df_t_2m['ens_mean'][:-1], df_t_2m['obs'][:-1]], axis=1)
+    random_state=0, min_samples_split=10, n_estimators=10)
+X_train = pd.concat([df_t_2m[['ens_mean', 'ens_sd', 'ens_skewness', 'ens_kurtosis']][:-1], df_t_2m['obs'][:-1]], axis=1)
 X_train = X_train.dropna()
-rfqr_fit = rfqr.fit(X_train['ens_mean'].array.reshape(-1,1) , X_train['obs'].values.ravel())
+rfqr_fit = rfqr.fit(X_train[['ens_mean', 'ens_sd', 'ens_skewness', 'ens_kurtosis']], X_train['obs'].values.ravel())
 print('a')
-rfqr_pred = rfqr.predict(df_t_2m['ens_mean'][len(df_t_2m)-1], quantile=98.5)
+rfqr_pred = rfqr.predict(df_t_2m[['ens_mean', 'ens_sd', 'ens_skewness', 'ens_kurtosis']].iloc[len(df_t_2m)-1].array.reshape(1,-1), quantile=98.5)
 
 """
 Relative evaluation of the different models with each other to check which model performs best in terms of evaluation criterion
