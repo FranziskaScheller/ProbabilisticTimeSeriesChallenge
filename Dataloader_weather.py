@@ -54,7 +54,7 @@ def DataLoaderHistWeather():
 
     return df
 
-def DataUpdaterWeather(update_date):
+def DataUpdaterWeather(update_date, real_obs):
 
     """
     Function for updating icon_eps_weather_data with new ensemble forecasts from git repository
@@ -87,36 +87,70 @@ def DataUpdaterWeather(update_date):
     df_t_2m['month'] = df_t_2m['obs_tm'].apply(lambda x: x.to_pydatetime().month)
     df_t_2m['year'] = df_t_2m['obs_tm'].apply(lambda x: x.to_pydatetime().year)
 
-    df_t_2m_mod = df_t_2m[
-        ['init_tm', 'fcst_hour', 'obs_tm', 'obs', 'ens_mean', 'ens_sd', 'ens_skewness', 'ens_kurtosis', 'ens_iqr_04_06',
-         'ens_iqr_025_075', 'ens_iqr_01_09', 'month', 'year']]
-    df_t_2m_mod = df_t_2m_mod.rename(
-        columns={'ens_mean': 'ens_mean_t_2m', 'ens_sd': 'ens_sd_t_2m', 'ens_skewness': 'ens_skewness_t_2m',
-                 'ens_kurtosis': 'ens_kurtosis_t_2m', 'ens_iqr_04_06': 'ens_iqr_04_06_t_2m',
-                 'ens_iqr_025_075': 'ens_iqr_025_075_t_2m', 'ens_iqr_01_09': 'ens_iqr_01_09_t_2m'})
-    df_t_2m_mod = df_t_2m_mod.merge(df_clct[['init_tm', 'fcst_hour', 'obs_tm', 'ens_mean', 'ens_sd','ens_skewness', 'ens_kurtosis', 'ens_iqr_04_06',
-         'ens_iqr_025_075', 'ens_iqr_01_09']],
-                                    how='left', on=['init_tm', 'fcst_hour', 'obs_tm'], validate="1:1")
-    df_t_2m_mod = df_t_2m_mod.rename(
-        columns={'ens_mean': 'ens_mean_clct', 'ens_sd': 'ens_sd_clct', 'ens_skewness': 'ens_skewness_clct',
-                 'ens_kurtosis': 'ens_kurtosis_clct', 'ens_iqr_04_06': 'ens_iqr_04_06_clct',
-                 'ens_iqr_025_075': 'ens_iqr_025_075_clct', 'ens_iqr_01_09': 'ens_iqr_01_09_clct'})
-    df_t_2m_mod = df_t_2m_mod.merge(df_mslp[['init_tm', 'fcst_hour', 'obs_tm', 'ens_mean', 'ens_sd', 'ens_skewness', 'ens_kurtosis', 'ens_iqr_04_06',
-         'ens_iqr_025_075', 'ens_iqr_01_09']],
-                                    how='left', on=['init_tm', 'fcst_hour', 'obs_tm'], validate="1:1")
-    df_t_2m_mod = df_t_2m_mod.rename(
-        columns={'ens_mean': 'ens_mean_mslp', 'ens_sd': 'ens_sd_mslp', 'ens_skewness': 'ens_skewness_mslp',
-                 'ens_kurtosis': 'ens_kurtosis_mslp', 'ens_iqr_04_06': 'ens_iqr_04_06_mslp',
-                 'ens_iqr_025_075': 'ens_iqr_025_075_mslp', 'ens_iqr_01_09': 'ens_iqr_01_09_mslp'})
-    df_t_2m_mod = df_t_2m_mod.merge(df_wind_10m[['init_tm', 'fcst_hour', 'obs_tm', 'ens_mean', 'ens_sd', 'ens_skewness', 'ens_kurtosis', 'ens_iqr_04_06',
-         'ens_iqr_025_075', 'ens_iqr_01_09']],
-                                    how='left', on=['init_tm', 'fcst_hour', 'obs_tm'], validate="1:1")
-    df_t_2m_mod = df_t_2m_mod.rename(
-        columns={'ens_mean': 'ens_mean_wind_10m', 'ens_sd': 'ens_sd_wind_10m', 'ens_skewness': 'ens_skewness_wind_10m',
-                 'ens_kurtosis': 'ens_kurtosis_wind_10m', 'ens_iqr_04_06': 'ens_iqr_04_06_wind_10m',
-                 'ens_iqr_025_075': 'ens_iqr_025_075_wind_10m', 'ens_iqr_01_09': 'ens_iqr_01_09_wind_10m'})
+    if real_obs == 'temperature':
+        df_t_2m_mod = df_t_2m[
+            ['init_tm', 'fcst_hour', 'obs_tm', 'obs', 'ens_mean', 'ens_sd', 'ens_skewness', 'ens_kurtosis', 'ens_iqr_04_06',
+             'ens_iqr_025_075', 'ens_iqr_01_09', 'month', 'year']]
+        df_t_2m_mod = df_t_2m_mod.rename(
+            columns={'ens_mean': 'ens_mean_t_2m', 'ens_sd': 'ens_sd_t_2m', 'ens_skewness': 'ens_skewness_t_2m',
+                     'ens_kurtosis': 'ens_kurtosis_t_2m', 'ens_iqr_04_06': 'ens_iqr_04_06_t_2m',
+                     'ens_iqr_025_075': 'ens_iqr_025_075_t_2m', 'ens_iqr_01_09': 'ens_iqr_01_09_t_2m'})
+        df_t_2m_mod = df_t_2m_mod.merge(df_clct[['init_tm', 'fcst_hour', 'obs_tm', 'ens_mean', 'ens_sd','ens_skewness', 'ens_kurtosis', 'ens_iqr_04_06',
+             'ens_iqr_025_075', 'ens_iqr_01_09']],
+                                        how='left', on=['init_tm', 'fcst_hour', 'obs_tm'], validate="1:1")
+        df_t_2m_mod = df_t_2m_mod.rename(
+            columns={'ens_mean': 'ens_mean_clct', 'ens_sd': 'ens_sd_clct', 'ens_skewness': 'ens_skewness_clct',
+                     'ens_kurtosis': 'ens_kurtosis_clct', 'ens_iqr_04_06': 'ens_iqr_04_06_clct',
+                     'ens_iqr_025_075': 'ens_iqr_025_075_clct', 'ens_iqr_01_09': 'ens_iqr_01_09_clct'})
+        df_t_2m_mod = df_t_2m_mod.merge(df_mslp[['init_tm', 'fcst_hour', 'obs_tm', 'ens_mean', 'ens_sd', 'ens_skewness', 'ens_kurtosis', 'ens_iqr_04_06',
+             'ens_iqr_025_075', 'ens_iqr_01_09']],
+                                        how='left', on=['init_tm', 'fcst_hour', 'obs_tm'], validate="1:1")
+        df_t_2m_mod = df_t_2m_mod.rename(
+            columns={'ens_mean': 'ens_mean_mslp', 'ens_sd': 'ens_sd_mslp', 'ens_skewness': 'ens_skewness_mslp',
+                     'ens_kurtosis': 'ens_kurtosis_mslp', 'ens_iqr_04_06': 'ens_iqr_04_06_mslp',
+                     'ens_iqr_025_075': 'ens_iqr_025_075_mslp', 'ens_iqr_01_09': 'ens_iqr_01_09_mslp'})
+        df_t_2m_mod = df_t_2m_mod.merge(df_wind_10m[['init_tm', 'fcst_hour', 'obs_tm', 'ens_mean', 'ens_sd', 'ens_skewness', 'ens_kurtosis', 'ens_iqr_04_06',
+             'ens_iqr_025_075', 'ens_iqr_01_09']],
+                                        how='left', on=['init_tm', 'fcst_hour', 'obs_tm'], validate="1:1")
+        df_t_2m_mod = df_t_2m_mod.rename(
+            columns={'ens_mean': 'ens_mean_wind_10m', 'ens_sd': 'ens_sd_wind_10m', 'ens_skewness': 'ens_skewness_wind_10m',
+                     'ens_kurtosis': 'ens_kurtosis_wind_10m', 'ens_iqr_04_06': 'ens_iqr_04_06_wind_10m',
+                     'ens_iqr_025_075': 'ens_iqr_025_075_wind_10m', 'ens_iqr_01_09': 'ens_iqr_01_09_wind_10m'})
+        weather_data = df_t_2m_mod
 
-    return df_t_2m_mod, df_t_2m, df_wind_10m
+    else:
+        df_wind_10m_mod = df_t_2m[
+            ['init_tm', 'fcst_hour', 'obs_tm', 'ens_mean', 'ens_sd', 'ens_skewness', 'ens_kurtosis', 'ens_iqr_04_06',
+             'ens_iqr_025_075', 'ens_iqr_01_09', 'month', 'year']]
+        df_wind_10m_mod = df_wind_10m_mod.rename(
+            columns={'ens_mean': 'ens_mean_t_2m', 'ens_sd': 'ens_sd_t_2m', 'ens_skewness': 'ens_skewness_t_2m',
+                     'ens_kurtosis': 'ens_kurtosis_t_2m', 'ens_iqr_04_06': 'ens_iqr_04_06_t_2m',
+                     'ens_iqr_025_075': 'ens_iqr_025_075_t_2m', 'ens_iqr_01_09': 'ens_iqr_01_09_t_2m'})
+        df_wind_10m_mod = df_wind_10m_mod.merge(df_clct[['init_tm', 'fcst_hour', 'obs_tm', 'ens_mean', 'ens_sd','ens_skewness', 'ens_kurtosis', 'ens_iqr_04_06',
+             'ens_iqr_025_075', 'ens_iqr_01_09']],
+                                        how='left', on=['init_tm', 'fcst_hour', 'obs_tm'], validate="1:1")
+        df_wind_10m_mod = df_wind_10m_mod.rename(
+            columns={'ens_mean': 'ens_mean_clct', 'ens_sd': 'ens_sd_clct', 'ens_skewness': 'ens_skewness_clct',
+                     'ens_kurtosis': 'ens_kurtosis_clct', 'ens_iqr_04_06': 'ens_iqr_04_06_clct',
+                     'ens_iqr_025_075': 'ens_iqr_025_075_clct', 'ens_iqr_01_09': 'ens_iqr_01_09_clct'})
+        df_wind_10m_mod = df_wind_10m_mod.merge(df_mslp[['init_tm', 'fcst_hour', 'obs_tm', 'ens_mean', 'ens_sd', 'ens_skewness', 'ens_kurtosis', 'ens_iqr_04_06',
+             'ens_iqr_025_075', 'ens_iqr_01_09']],
+                                        how='left', on=['init_tm', 'fcst_hour', 'obs_tm'], validate="1:1")
+        df_wind_10m_mod = df_wind_10m_mod.rename(
+            columns={'ens_mean': 'ens_mean_mslp', 'ens_sd': 'ens_sd_mslp', 'ens_skewness': 'ens_skewness_mslp',
+                     'ens_kurtosis': 'ens_kurtosis_mslp', 'ens_iqr_04_06': 'ens_iqr_04_06_mslp',
+                     'ens_iqr_025_075': 'ens_iqr_025_075_mslp', 'ens_iqr_01_09': 'ens_iqr_01_09_mslp'})
+        df_wind_10m_mod = df_wind_10m_mod.merge(df_wind_10m[['init_tm', 'fcst_hour', 'obs_tm','obs', 'ens_mean', 'ens_sd', 'ens_skewness', 'ens_kurtosis', 'ens_iqr_04_06',
+             'ens_iqr_025_075', 'ens_iqr_01_09']],
+                                        how='left', on=['init_tm', 'fcst_hour', 'obs_tm'], validate="1:1")
+        df_wind_10m_mod = df_wind_10m_mod.rename(
+            columns={'ens_mean': 'ens_mean_wind_10m', 'ens_sd': 'ens_sd_wind_10m', 'ens_skewness': 'ens_skewness_wind_10m',
+                     'ens_kurtosis': 'ens_kurtosis_wind_10m', 'ens_iqr_04_06': 'ens_iqr_04_06_wind_10m',
+                     'ens_iqr_025_075': 'ens_iqr_025_075_wind_10m', 'ens_iqr_01_09': 'ens_iqr_01_09_wind_10m'})
+
+        weather_data = df_wind_10m_mod
+
+    return weather_data, df_t_2m, df_wind_10m
 
 def DataLoaderWeather(df):
     """

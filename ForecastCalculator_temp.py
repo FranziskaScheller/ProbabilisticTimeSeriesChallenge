@@ -9,8 +9,7 @@ from rpy2.robjects import pandas2ri
 from rpy2.robjects.conversion import localconverter
 from datetime import datetime, timedelta
 from Dataloader_weather import DataUpdaterWeather
-from WeatherForecastModels import EMOS, GBM
-from skgarden import RandomForestQuantileRegressor
+from WeatherForecastModels import EMOS, GBM, QRF
 from scipy.stats import norm
 from sklearn.metrics import mean_pinball_loss
 
@@ -40,7 +39,7 @@ load weather data
 """
 # load data frame weather_data with r_icon_eps weather data and ensemble forecasts from 'YYYY-MM-DD'
 #weather_data = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'))
-weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather('2021-12-15')
+weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather('2021-12-15', 'temperature')
 
 """
 First visualize real temperature observations to get a feeling for the data
@@ -80,8 +79,8 @@ for i in horizon:
     t2m_data_fcsth_i = df_t_2m[(df_t_2m['fcst_hour'] == i)]
     #t2m_data_fcsth_i = t2m_data_fcsth_i[t2m_data_fcsth_i['init_tm'].dt.month.isin([10,11,12])]
 
-    t2m_data_fcsth_i_train = t2m_data_fcsth_i[['ens_mean', 'ens_sd', 'obs']].iloc[0:len(t2m_data_fcsth_i) - 1]
-    t2m_data_fcsth_i_test = t2m_data_fcsth_i[['ens_mean', 'ens_sd']].iloc[-1:]
+    t2m_data_fcsth_i_train = t2m_data_fcsth_i[['ens_mean', 'ens_sd', 'ens_skewness', 'obs']].iloc[0:len(t2m_data_fcsth_i) - 1]
+    t2m_data_fcsth_i_test = t2m_data_fcsth_i[['ens_mean', 'ens_sd', 'ens_skewness']].iloc[-1:]
 
     # t2m_data_fcsth48[(t2m_data_fcsth48.isnull().values) == True]
     # t2m_data_fcsth48.rolling(7)
@@ -95,7 +94,7 @@ for i in horizon:
                f <- function(t2m_data_fcsth_i_train) {
 
                         library(crch)
-                        train1.crch <- crch(obs ~ ens_mean|ens_sd, data = t2m_data_fcsth_i_train_r, dist = "gaussian", type = "crps", link.scale = "log")
+                        train1.crch <- crch(obs ~ ens_mean + ens_skewness|ens_sd + ens_skewness, data = t2m_data_fcsth_i_train_r, dist = "gaussian", type = "crps", link.scale = "log")
 
                 }
                 ''')
@@ -215,19 +214,14 @@ for i in horizon:
         percentile_q = norm(loc=estimated_params_boost_EMOS['mu'][estimated_params_boost_EMOS['horizon'] == i], scale=estimated_params_boost_EMOS['sd'][estimated_params_boost_EMOS['horizon'] == i]).ppf(q)
         estimated_params_boost_EMOS[str(q)][estimated_params_boost_EMOS['horizon'] == i] = percentile_q
 
-    #scipy.stats.norm(loc=prediction_mu, scale=prediction_sd).ppf(0.025)
 estimated_params_boost_EMOS[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/temp_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
 
 """
-QuantileRandomForest Tests
+Variable selection for EMOS: Want to use more regressors but must be carefull due to overfitting so only incorporate relevant ones
+Therefore for now we simply look at correlations between temperature observation, temperature mean and temperature standard deviation and all other features to get feeling for dependencies 
+Note: Of course using all data is kind of overfitting when we evaluate models later on with rolling window but since this is only an indicator we accept that for now
 """
-rfqr = RandomForestQuantileRegressor(
-    random_state=0, min_samples_split=10, n_estimators=10)
-X_train = pd.concat([df_t_2m[['ens_mean', 'ens_sd', 'ens_skewness', 'ens_kurtosis']][:-1], df_t_2m['obs'][:-1]], axis=1)
-X_train = X_train.dropna()
-rfqr_fit = rfqr.fit(X_train[['ens_mean', 'ens_sd', 'ens_skewness', 'ens_kurtosis']], X_train['obs'].values.ravel())
-print('a')
-rfqr_pred = rfqr.predict(df_t_2m[['ens_mean', 'ens_sd', 'ens_skewness', 'ens_kurtosis']].iloc[len(df_t_2m)-1].array.reshape(1,-1), quantile=98.5)
+corr_weather_data = weather_data.drop(columns = ['init_tm', 'obs_tm', 'month', 'year']).corr()
 
 """
 Relative evaluation of the different models with each other to check which model performs best in terms of evaluation criterion
@@ -272,7 +266,10 @@ def RollingWindowQuantileCalculator(model, data, length_train_data, index_drop_n
 
             for q in quantile_levels:
                 if model == EMOS:
-                    quantile_preds_rw_h[str(q)][quantile_preds_rw_h['init_tm'] == time] = model(q, X_train[['ens_mean_t_2m', 'ens_sd_t_2m']], y_train, X_test[['ens_mean_t_2m', 'ens_sd_t_2m']].to_frame().T, emos_ind_boosting)
+                    quantile_preds_rw_h[str(q)][quantile_preds_rw_h['init_tm'] == time] = model(q, X_train.drop(
+                        columns=['init_tm', 'obs_tm']), y_train, X_test.drop(
+                        columns=['init_tm', 'obs_tm']).to_frame().T, emos_ind_boosting)
+
                 else:
                     quantile_preds_rw_h[str(q)][quantile_preds_rw_h['init_tm'] == time] = model(q, X_train.drop(
                         columns=['init_tm', 'fcst_hour', 'obs_tm']), y_train, X_test)
@@ -286,6 +283,7 @@ def RollingWindowQuantileCalculator(model, data, length_train_data, index_drop_n
 
     return quantile_preds_rw
 
+quantile_preds_rw_qrf = RollingWindowQuantileCalculator(QRF, weather_data, 900, index_drop_na=True, horizon=horizon, emos_ind_boosting=False, considered_days = 366)
 quantile_preds_rw_emos = RollingWindowQuantileCalculator(EMOS, weather_data, 900, index_drop_na=True, horizon=horizon, emos_ind_boosting=False, considered_days = 366)
 quantile_preds_rw_emos_boosting = RollingWindowQuantileCalculator(EMOS, weather_data, 900, index_drop_na=True, horizon=horizon, emos_ind_boosting=True, considered_days = 366)
 quantile_preds_rw_gbm = RollingWindowQuantileCalculator(GBM, weather_data, 900, index_drop_na=True, horizon=horizon, emos_ind_boosting=False, considered_days = 366)
@@ -313,6 +311,9 @@ avg_pinball_loss_emos_boosting, avg_pinball_loss_per_quantile_emos_boosting, avg
 quantile_preds_rw_gbm = quantile_preds_rw_gbm.merge(weather_data[['obs', 'init_tm', 'obs_tm']], on=['init_tm', 'obs_tm'], how='left', validate='1:1')
 avg_pinball_loss_gbm, avg_pinball_loss_per_quantile_gbm, avg_pinball_loss_overall_gbm = QuantilePredictionEvaluator(quantile_preds_rw_gbm, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
 
+quantile_preds_rw_qrf = quantile_preds_rw_qrf.merge(weather_data[['obs', 'init_tm', 'obs_tm']], on=['init_tm', 'obs_tm'], how='left', validate='1:1')
+avg_pinball_loss_qrf, avg_pinball_loss_per_quantile_qrf, avg_pinball_loss_overall_qrf = QuantilePredictionEvaluator(quantile_preds_rw_qrf, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
+
 #
 """
 Grid search of parameters with rolling window evaluation 
@@ -324,13 +325,16 @@ Grid search of parameters with rolling window evaluation
 # Alternative would be shorter training data sizes because then we only choose last few days/months but we wouldn't choose from months that come after month of current prediction
 
 array_len_days = [92, 155, 220, 366]
-average_qs_len_months = pd.DataFrame(array_len_days, columns=['nbr_considered_months'])
-average_qs_len_months[['EMOS', 'EMOS_boosting', 'Boosting']] = np.zeros((len(average_qs_len_months), 3))
+average_qs_len_months = pd.DataFrame(array_len_days, columns=['nbr_considered_days'])
+average_qs_len_months[['EMOS', 'EMOS_boosting', 'Boosting', 'QRF']] = np.zeros((len(average_qs_len_months), 4))
+
 for m in array_len_days:
 
     quantile_preds_rw_emos = RollingWindowQuantileCalculator(EMOS, weather_data, 600, index_drop_na=True, horizon=horizon, emos_ind_boosting=False, considered_days = m)
     quantile_preds_rw_emos_boosting = RollingWindowQuantileCalculator(EMOS, weather_data, 600, index_drop_na=True, horizon=horizon, emos_ind_boosting=True, considered_days = m)
     quantile_preds_rw_gbm = RollingWindowQuantileCalculator(GBM, weather_data, 600, index_drop_na=True, horizon=horizon, emos_ind_boosting=False, considered_days = m)
+    quantile_preds_rw_qrf = RollingWindowQuantileCalculator(QRF, weather_data, 600, index_drop_na=True, horizon=horizon,
+                                                            emos_ind_boosting=False, considered_days=m)
 
     quantile_preds_rw_emos = quantile_preds_rw_emos.merge(weather_data[['obs', 'init_tm', 'obs_tm']], on = ['init_tm', 'obs_tm'], how = 'left', validate = '1:1')
     avg_pinball_loss_emos, avg_pinball_loss_per_quantile_emos, avg_pinball_loss_overall_emos = QuantilePredictionEvaluator(quantile_preds_rw_emos, quantile_levels = [0.025, 0.25, 0.5, 0.75, 0.975], horizons = horizon)
@@ -344,6 +348,11 @@ for m in array_len_days:
     avg_pinball_loss_gbm, avg_pinball_loss_per_quantile_gbm, avg_pinball_loss_overall_gbm = QuantilePredictionEvaluator(quantile_preds_rw_gbm, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
     average_qs_len_months['Boosting'][average_qs_len_months['nbr_considered_months'] == m] = avg_pinball_loss_overall_gbm
 
+    quantile_preds_rw_qrf = quantile_preds_rw_qrf.merge(weather_data[['obs', 'init_tm', 'obs_tm']], on=['init_tm', 'obs_tm'], how='left', validate='1:1')
+    avg_pinball_loss_qrf, avg_pinball_loss_per_quantile_qrf, avg_pinball_loss_overall_qrf = QuantilePredictionEvaluator(quantile_preds_rw_qrf, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
+    average_qs_len_months['QRF'][average_qs_len_months['nbr_considered_months'] == m] = avg_pinball_loss_overall_qrf
+
+print(1)
 """
 Absolute Evaluation of forecasts separately to evaluate if model generally is appropriate 
 """
