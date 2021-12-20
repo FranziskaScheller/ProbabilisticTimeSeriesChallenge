@@ -261,7 +261,176 @@ estimated_params.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/DAX_pred
 #         mu_r = r_float(df_forecasts[['mean_fcst_' + str(j)]].iloc[i])
 #         sigma_r = r_float(np.sqrt(df_forecasts[['var_fcst_' + str(j)]].iloc[i]))
 #         df_forecasts['crps_' + str(j)].iloc[i] = np.array(scoringRules.crps(y_true_r, mean=mu_r, sd=sigma_r, family="normal"))
+"""
+ARMA Garch 
+"""
+import rpy2.robjects.packages as rpackages
+import rpy2.robjects as robjects
 
+import rpy2.robjects.numpy2ri
+rpy2.robjects.numpy2ri.activate()
+
+rugarch = rpackages.importr('rugarch')
+
+#GARCH(1,1)
+variance_model = robjects.ListVector({'model': "sGARCH",
+                                      'garchOrder': robjects.IntVector([1, 1])})
+
+#ARMA(1,1)
+mean_model = robjects.ListVector({'armaOrder': robjects.IntVector([1, 1]),
+                                  'include.mean': True})
+
+
+params= robjects.ListVector({'shape': 3})
+
+model = rugarch.ugarchspec(variance_model=variance_model,
+                           mean_model=mean_model,
+                           distribution_model="std",
+                           fixed_pars=params)
+
+"""
+Forecasts next 5 days 
+"""
+end_date_train = rets['Date'].iloc[-1]
+start_date_train = end_date_train - timedelta(days = len_train_dat)
+
+n = len(rets[rets['Date'] >= start_date_train])
+n_train = n
+
+col_names = ["mean_fcst_" + str(i) for i in range(1, 6)] + ["var_fcst_" + str(i) for i in range(1, 6)] + [
+    'crps_' + str(i) for i in range(1, 6)]
+df_forecasts = pd.DataFrame(np.zeros((1, 15)), columns=col_names)
+df_forecasts['Date'] = end_date_train + timedelta(days=1)
+train_dat = rets[(start_date_train <= rets['Date']) & (rets['Date'] <= end_date_train)]
+for d in range(1, 6):
+    # basic_gm = arch_model(train_dat['ret_' + str(d)], p=1, q=1,
+    #                         mean='constant', vol='GARCH', dist='normal')
+    # # Fit the model
+    # gm_result = basic_gm.fit()
+    # gm_forecast = gm_result.forecast(horizon=1)
+
+    # In the following, I'm assuming that your timeseries is in a numpy array called "y"
+    modelfit = rugarch.ugarchfit(spec=model,
+                                 data=train_dat['ret_' + str(d)].to_numpy(),
+                                 solver='hybrid',
+                                 tol=1e-3)
+
+    # historic mu and sigma
+    sigma_hist = np.asarray(rugarch.sigma(modelfit))
+    mu_hist = np.asarray(rugarch.fitted(modelfit))
+
+    # 1-day ahead forecast mu and sigma
+    forecast = rugarch.ugarchforecast(modelfit)
+
+    df_forecasts['mean_fcst_' + str(d)].iloc[0] = np.asarray(rugarch.fitted(forecast))[0]
+    df_forecasts['var_fcst_' + str(d)].iloc[0] = np.asarray(rugarch.sigma(forecast))[0]
+
+    start_date_train = start_date_train + timedelta(days=1)
+    end_date_train = end_date_train + timedelta(days=1)
+
+estimated_params = pd.DataFrame(np.zeros((5, 6)), columns=['quantile', '1', '2', '3', '4', '5'])
+estimated_params['quantile'] = [str(i) for i in quantile_levels]
+
+for i in range(1, 6):
+    for q in quantile_levels:
+        percentile_q = norm(loc=df_forecasts['mean_fcst_' + str(i)].iloc[0], scale=np.sqrt(df_forecasts['var_fcst_' + str(i)].iloc[0])).ppf(q)
+        estimated_params[str(i)][estimated_params['quantile'] == str(q)] = percentile_q
+
+estimated_params.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/DAX_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+
+"""
+Find order of AR and MA processes in GARCH Model 
+"""
+
+def ARMAGarchFitter(data, len_train_data_in_days, pAR, qMA, pGARCH, qGARCH):
+    # GARCH(pGARCH, qGARCH)
+    variance_model = robjects.ListVector({'model': "sGARCH",
+                                          'garchOrder': robjects.IntVector([pGARCH, qGARCH])})
+
+    # ARMA(pAR, qMA)
+    mean_model = robjects.ListVector({'armaOrder': robjects.IntVector([pAR, qMA]),
+                                      'include.mean': True})
+
+    params = robjects.ListVector({'shape': 3})
+
+    model = rugarch.ugarchspec(variance_model=variance_model,
+                               mean_model=mean_model,
+                               distribution_model="std",
+                               fixed_pars=params)
+
+    n = len(data)
+    start_date_train = data['Date'][0]
+    end_date_train = start_date_train + timedelta(days=len_train_data_in_days)
+
+    df_forecasts = pd.DataFrame(np.zeros((len(data[data['Date'] > end_date_train]) * 5, 4)) * np.NAN,
+                                columns=['Date', "horizon", "mean_fcst", "sd_fcst"])
+    ind_start_date_train = 0
+    ind_end_date_train = data[data['Date'] <= end_date_train].index[-1]
+    j = 0
+    for i in range(0, len(data[data['Date'] > end_date_train])):
+        train_dat = data.iloc[ind_start_date_train:ind_end_date_train+1]
+        for d in range(1, 6):
+            df_forecasts['Date'].iloc[j] = data['Date'].iloc[ind_end_date_train+1]
+            df_forecasts['horizon'].iloc[j] = int(d)
+            modelfit = rugarch.ugarchfit(spec=model,
+                                         data=train_dat['ret_' + str(d)].to_numpy(),
+                                         solver='hybrid',
+                                         tol=1e-3)
+
+            # historic mu and sigma
+            sigma_hist = np.asarray(rugarch.sigma(modelfit))
+            mu_hist = np.asarray(rugarch.fitted(modelfit))
+
+            # 1-day ahead forecast mu and sigma
+            forecast = rugarch.ugarchforecast(modelfit)
+
+            df_forecasts['mean_fcst'].iloc[j] = np.asarray(rugarch.fitted(forecast))[0]
+            df_forecasts['sd_fcst'].iloc[j] = np.asarray(rugarch.sigma(forecast))[0]
+            j = j + 1
+
+        ind_start_date_train = ind_start_date_train + 1
+        ind_end_date_train = ind_end_date_train + 1
+
+
+    quantile_predictions = pd.DataFrame(np.zeros((len(df_forecasts), 7)), columns=['Date', 'horizon']+[str(q) for q in quantile_levels])
+    quantile_predictions['Date'] = df_forecasts['Date']
+    quantile_predictions['horizon'] = df_forecasts['horizon']
+
+    for t in range(0, len(df_forecasts)):
+        for q in quantile_levels:
+            quantile_predictions[str(q)].iloc[t] = norm(loc=df_forecasts['mean_fcst'].iloc[t], scale=df_forecasts['sd_fcst'].iloc[t]).ppf(q)
+
+    return quantile_predictions
+
+quantile_preds_test = ARMAGarchFitter(rets, 366, 1, 1, 1, 1)
+
+def QuantilePredictionEvaluator(predictions):
+    avg_pinball_loss = pd.DataFrame([1,2,3,4,5], columns=['horizon'])
+    avg_pinball_loss[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros(len(avg_pinball_loss))
+
+    for h in range(1, 6):
+        preds = predictions[quantile_preds_test['horizon'] == h]
+        preds['Date'] = preds['Date'].astype('datetime64[ns]')
+        rets['Date'] = rets['Date'].astype('datetime64[ns]')
+        preds_obs = preds.merge(rets[['Date', 'ret_' + str(h)]], on='Date', how='left', validate='1:1')
+        for q in quantile_levels:
+            avg_pinball_loss[str(q)][avg_pinball_loss['horizon'] == h] = mean_pinball_loss(preds_obs['ret_' + str(h)], preds_obs[str(q)], alpha=q)
+
+    avg_pinball_loss['avg_per_horizon'] = avg_pinball_loss[['0.025', '0.25', '0.5', '0.75', '0.975']].mean(axis = 1)
+    avg_pinball_loss_per_quantile = avg_pinball_loss[['0.025', '0.25', '0.5', '0.75', '0.975']].mean(axis = 0)
+    avg_pinball_loss_overall = avg_pinball_loss_per_quantile.mean()
+    return avg_pinball_loss, avg_pinball_loss_per_quantile, avg_pinball_loss_overall
+
+avg_pinball_loss, avg_pinball_loss_per_quantile, avg_pinball_loss_overall = QuantilePredictionEvaluator(quantile_preds_test)
+
+for h in range(1,6):
+    preds = quantile_preds_test[quantile_preds_test['horizon'] == h]
+    preds['Date'] = preds['Date'].astype('datetime64[ns]')
+    rets['Date'] = rets['Date'].astype('datetime64[ns]')
+    preds_obs = preds.merge(rets[['Date', 'ret_' + str(h)]], on='Date', how='left', validate = '1:1')
+
+
+real_obs = rets.iloc[len(quantile_preds_test):]
 """
 Evaluation of predictions with pinball loss and tests 
 """

@@ -12,6 +12,7 @@ from Dataloader_weather import DataUpdaterWeather
 from WeatherForecastModels import EMOS, GBM, QRF
 from scipy.stats import norm
 from sklearn.metrics import mean_pinball_loss
+from sklearn.model_selection import KFold
 
 """
 In the following we first set up the rpy2 framework in order to be able to use R packages afterwards
@@ -353,6 +354,17 @@ for m in array_len_days:
     average_qs_len_months['QRF'][average_qs_len_months['nbr_considered_months'] == m] = avg_pinball_loss_overall_qrf
 
 print(1)
+
+"""
+Combination of forecasts with Quantile Regression and Evaluation of approach with Cross Validation
+"""
+
+kf = KFold(n_splits=8)
+# train individuals models on 4 folds, train quantile regression on 2 other folds and evaluate on 2 other folds
+for train_index, test_index in kf.split(X):
+    X_train, X_test = X[train_index], X[test_index]
+    y_train, y_test = y[train_index], y[test_index]
+
 """
 Absolute Evaluation of forecasts separately to evaluate if model generally is appropriate 
 """
