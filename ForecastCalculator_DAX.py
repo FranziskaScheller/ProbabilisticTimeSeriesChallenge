@@ -297,7 +297,7 @@ start_date_train = end_date_train - timedelta(days = len_train_dat)
 n = len(rets[rets['Date'] >= start_date_train])
 n_train = n
 
-col_names = ["mean_fcst_" + str(i) for i in range(1, 6)] + ["var_fcst_" + str(i) for i in range(1, 6)] + [
+col_names = ["mean_fcst_" + str(i) for i in range(1, 6)] + ["sd_fcst_" + str(i) for i in range(1, 6)] + [
     'crps_' + str(i) for i in range(1, 6)]
 df_forecasts = pd.DataFrame(np.zeros((1, 15)), columns=col_names)
 df_forecasts['Date'] = end_date_train + timedelta(days=1)
@@ -323,7 +323,7 @@ for d in range(1, 6):
     forecast = rugarch.ugarchforecast(modelfit)
 
     df_forecasts['mean_fcst_' + str(d)].iloc[0] = np.asarray(rugarch.fitted(forecast))[0]
-    df_forecasts['var_fcst_' + str(d)].iloc[0] = np.asarray(rugarch.sigma(forecast))[0]
+    df_forecasts['sd_fcst_' + str(d)].iloc[0] = np.asarray(rugarch.sigma(forecast))[0]
 
     start_date_train = start_date_train + timedelta(days=1)
     end_date_train = end_date_train + timedelta(days=1)
@@ -333,7 +333,7 @@ estimated_params['quantile'] = [str(i) for i in quantile_levels]
 
 for i in range(1, 6):
     for q in quantile_levels:
-        percentile_q = norm(loc=df_forecasts['mean_fcst_' + str(i)].iloc[0], scale=np.sqrt(df_forecasts['var_fcst_' + str(i)].iloc[0])).ppf(q)
+        percentile_q = norm(loc=df_forecasts['mean_fcst_' + str(i)].iloc[0], scale=df_forecasts['sd_fcst_' + str(i)].iloc[0]).ppf(q)
         estimated_params[str(i)][estimated_params['quantile'] == str(q)] = percentile_q
 
 estimated_params.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/DAX_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
@@ -423,14 +423,42 @@ def QuantilePredictionEvaluator(predictions):
 
 avg_pinball_loss, avg_pinball_loss_per_quantile, avg_pinball_loss_overall = QuantilePredictionEvaluator(quantile_preds_test)
 
-for h in range(1,6):
-    preds = quantile_preds_test[quantile_preds_test['horizon'] == h]
-    preds['Date'] = preds['Date'].astype('datetime64[ns]')
-    rets['Date'] = rets['Date'].astype('datetime64[ns]')
-    preds_obs = preds.merge(rets[['Date', 'ret_' + str(h)]], on='Date', how='left', validate = '1:1')
+
+"""
+Select p and q for ARMA and GARCH
+"""
+
+# avg_pinball_loss_choice_p_q = pd.DataFrame([[0, 0, 1, 1], [0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 1, 1], [1, 2, 1, 1], [2, 1, 1, 1], [2, 2, 1, 1], [3, 1, 1, 1], [1, 3, 1, 1], [3, 2, 1, 1], [2, 3, 1, 1], [3, 3, 1, 1]], columns = ['pAR', 'qMA', 'pGARCH', 'qGARCH'])
+# avg_pinball_loss_choice_p_q[["avg_pinball_loss_" + str(i) for i in quantile_levels] + ["avg_pinball_loss_overall"]] = np.zeros(len(quantile_levels) + 1)
+#
+# loss = np.zeros((len(avg_pinball_loss_choice_p_q),6))
+# for i in range(0, len(avg_pinball_loss_choice_p_q)):
+#     quantile_preds_test = ARMAGarchFitter(rets, 366, avg_pinball_loss_choice_p_q['pAR'].iloc[i], avg_pinball_loss_choice_p_q['qMA'].iloc[i], avg_pinball_loss_choice_p_q['pGARCH'].iloc[i], avg_pinball_loss_choice_p_q['qGARCH'].iloc[i])
+#     avg_pinball_loss, avg_pinball_loss_per_quantile, avg_pinball_loss_overall = QuantilePredictionEvaluator(
+#         quantile_preds_test)
+#     loss[i, 0:5] = avg_pinball_loss_per_quantile
+#     loss[i, 5] = avg_pinball_loss_overall
+#
+# avg_pinball_loss_choice_p_q[["avg_pinball_loss_" + str(i) for i in quantile_levels] + ['avg_pinball_loss_overall']] = loss
+
+avg_pinball_loss_choice_p_q_GARCH = pd.DataFrame([[3, 3, 0, 0], [3, 3, 1, 0], [3, 3, 0, 1], [3, 3, 1, 1], [3, 3, 2, 1], [3, 3, 1, 2], [3, 3, 2, 2], [3, 3, 3, 1], [3, 3, 1, 3], [3, 3, 3, 2], [3, 3, 2, 3], [3, 3, 3, 3]], columns = ['pAR', 'qMA', 'pGARCH', 'qGARCH'])
+avg_pinball_loss_choice_p_q_GARCH[["avg_pinball_loss_" + str(i) for i in quantile_levels] + ["avg_pinball_loss_overall"]] = np.zeros(len(quantile_levels) + 1)
+
+loss = np.zeros((len(avg_pinball_loss_choice_p_q_GARCH),6))
+for i in range(0, len(avg_pinball_loss_choice_p_q_GARCH)):
+    quantile_preds_test = ARMAGarchFitter(rets, 366, avg_pinball_loss_choice_p_q_GARCH['pAR'].iloc[i], avg_pinball_loss_choice_p_q_GARCH['qMA'].iloc[i], avg_pinball_loss_choice_p_q_GARCH['pGARCH'].iloc[i], avg_pinball_loss_choice_p_q_GARCH['qGARCH'].iloc[i])
+    avg_pinball_loss, avg_pinball_loss_per_quantile, avg_pinball_loss_overall = QuantilePredictionEvaluator(
+        quantile_preds_test)
+    loss[i, 0:5] = avg_pinball_loss_per_quantile
+    loss[i, 5] = avg_pinball_loss_overall
+
+avg_pinball_loss_choice_p_q_GARCH[["avg_pinball_loss_" + str(i) for i in quantile_levels] + ['avg_pinball_loss_overall']] = loss
 
 
-real_obs = rets.iloc[len(quantile_preds_test):]
+"""
+Could also tune this separately for the different horizons 
+"""
+
 """
 Evaluation of predictions with pinball loss and tests 
 """
