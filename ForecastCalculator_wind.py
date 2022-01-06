@@ -33,8 +33,8 @@ scoringRules = rpackages.importr('scoringRules')
 crch = rpackages.importr('crch')
 """ load wind data """
 #weather_data = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'))
-weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather('2021-12-15', 'wind')
-
+#weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather('2021-12-15', 'wind')
+weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'), 'wind')
 """
 First visualize real wind observations to get a feeling for the data
 """
@@ -187,6 +187,19 @@ for i in horizon:
 estimated_params_boost_EMOS['0.025'][estimated_params_boost_EMOS['horizon'] == 72] = estimated_params['0.025'][estimated_params['horizon'] == 72]
 estimated_params_boost_EMOS[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/wind_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
 
+ind_boosting = True
+for i in horizon:
+    weather_data_i = weather_data[(weather_data['fcst_hour'] == i)].reset_index().drop(columns = 'index')
+    weather_data_i = weather_data_i.drop(columns = ['init_tm', 'obs_tm'])
+    quantile_levels = [0.025, 0.25, 0.5, 0.75, 0.975]
+
+    for q in quantile_levels:
+        estimated_params[str(q)][estimated_params['horizon'] == i] = EMOS_wind(q, weather_data_i.drop(columns='obs').iloc[0:len(weather_data_i) - 1], weather_data_i['obs'].iloc[0:len(weather_data_i) - 1], weather_data_i.drop(columns='obs').iloc[-1:], ind_boosting)
+
+    #scipy.stats.norm(loc=prediction_mu, scale=prediction_sd).ppf(0.025)
+estimated_params[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/wind_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+
+print(1)
 """
 Relative evaluation of the different models with each other to check which model performs best in terms of evaluation criterion
 Use average over linear quantile scores since that's an approximation of the CRPS which is a strictly proper scoring rule
@@ -246,6 +259,11 @@ def RollingWindowQuantileCalculator(model, data, length_train_data, index_drop_n
         ind = ind + 1
 
     return quantile_preds_rw
+
+
+quantile_preds_rw_emos_boosting_submission = RollingWindowQuantileCalculator(EMOS_wind, weather_data, len(weather_data)-1, index_drop_na=True, horizon=horizon, emos_ind_boosting=True, considered_days = 366)
+quantile_preds_rw_emos_boosting_submission[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/wind_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+
 
 quantile_preds_rw_qrf = RollingWindowQuantileCalculator(QRF, weather_data, 900, index_drop_na=True, horizon=horizon, emos_ind_boosting=False, considered_days = 366)
 quantile_preds_rw_emos = RollingWindowQuantileCalculator(EMOS_wind, weather_data, 900, index_drop_na=True, horizon=horizon, emos_ind_boosting=False, considered_days = 366)

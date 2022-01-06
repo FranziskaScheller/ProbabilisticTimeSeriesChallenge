@@ -274,10 +274,10 @@ rugarch = rpackages.importr('rugarch')
 
 #GARCH(1,1)
 variance_model = robjects.ListVector({'model': "sGARCH",
-                                      'garchOrder': robjects.IntVector([1, 1])})
+                                      'garchOrder': robjects.IntVector([1, 3])})
 
 #ARMA(1,1)
-mean_model = robjects.ListVector({'armaOrder': robjects.IntVector([1, 1]),
+mean_model = robjects.ListVector({'armaOrder': robjects.IntVector([3, 3]),
                                   'include.mean': True})
 
 
@@ -441,7 +441,7 @@ Select p and q for ARMA and GARCH
 #
 # avg_pinball_loss_choice_p_q[["avg_pinball_loss_" + str(i) for i in quantile_levels] + ['avg_pinball_loss_overall']] = loss
 
-avg_pinball_loss_choice_p_q_GARCH = pd.DataFrame([[3, 3, 0, 0], [3, 3, 1, 0], [3, 3, 0, 1], [3, 3, 1, 1], [3, 3, 2, 1], [3, 3, 1, 2], [3, 3, 2, 2], [3, 3, 3, 1], [3, 3, 1, 3], [3, 3, 3, 2], [3, 3, 2, 3], [3, 3, 3, 3]], columns = ['pAR', 'qMA', 'pGARCH', 'qGARCH'])
+avg_pinball_loss_choice_p_q_GARCH = pd.DataFrame([[3, 3, 1, 0], [3, 3, 0, 1], [3, 3, 1, 1], [3, 3, 2, 1], [3, 3, 1, 2], [3, 3, 2, 2], [3, 3, 3, 1], [3, 3, 1, 3], [3, 3, 3, 2], [3, 3, 2, 3], [3, 3, 3, 3]], columns = ['pAR', 'qMA', 'pGARCH', 'qGARCH'])
 avg_pinball_loss_choice_p_q_GARCH[["avg_pinball_loss_" + str(i) for i in quantile_levels] + ["avg_pinball_loss_overall"]] = np.zeros(len(quantile_levels) + 1)
 
 loss = np.zeros((len(avg_pinball_loss_choice_p_q_GARCH),6))

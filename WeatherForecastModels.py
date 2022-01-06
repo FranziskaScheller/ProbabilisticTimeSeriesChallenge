@@ -184,3 +184,21 @@ def QRF(q, X_train, y_train, X_test):
     pred = rfqr.predict(X_test.array.reshape(1, -1), quantile=(q*100))
 
     return pred
+
+
+"""
+Function for evaluation of quantile forecasts with quantile score
+"""
+
+def QuantilePredictionEvaluator(predictions, quantile_levels, horizons):
+    avg_pinball_loss = pd.DataFrame(horizons, columns=['horizon'])
+    avg_pinball_loss[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros(len(avg_pinball_loss))
+
+    for q in quantile_levels:
+        for h in horizons:
+            avg_pinball_loss[str(q)][avg_pinball_loss['horizon'] == h] = mean_pinball_loss(predictions['obs'][predictions['horizon'] == h], predictions[str(q)][predictions['horizon'] == h], alpha=q)
+
+    avg_pinball_loss['avg_per_horizon'] = avg_pinball_loss[['0.025', '0.25', '0.5', '0.75', '0.975']].mean(axis = 1)
+    avg_pinball_loss_per_quantile = avg_pinball_loss[['0.025', '0.25', '0.5', '0.75', '0.975']].mean(axis = 0)
+    avg_pinball_loss_overall = avg_pinball_loss_per_quantile.mean()
+    return avg_pinball_loss, avg_pinball_loss_per_quantile, avg_pinball_loss_overall
