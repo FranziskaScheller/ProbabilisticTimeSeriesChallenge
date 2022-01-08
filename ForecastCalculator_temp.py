@@ -493,11 +493,15 @@ def QRAFitterAndEvaluator(len_rw_individual_preds, len_rw_qra_model):
 
     return eval_data_all_horizons
 
-#eval_data_all_horizons = QRAFitterAndEvaluator(910, 60)
+eval_data_all_horizons = QRAFitterAndEvaluator(600, 250)
+eval_data_all_horizons.to_csv('/Users/franziska/Dropbox/DataPTSFC/eval_data_all_horizons_qra_rw_600_250' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
 
 #todo: deal with quantile crossing and find out why 15 - 17, 19 sept 2021 75 % quantile so weird
 
-#avg_pinball_loss_emos, avg_pinball_loss_per_quantile_emos, avg_pinball_loss_overall_emos = QuantilePredictionEvaluator(eval_data_all_horizons, quantile_levels = [0.025, 0.25, 0.5, 0.75, 0.975], horizons = horizon)
+avg_pinball_loss_qra, avg_pinball_loss_per_quantile_qra, avg_pinball_loss_overall_qra = QuantilePredictionEvaluator(eval_data_all_horizons, quantile_levels = [0.025, 0.25, 0.5, 0.75, 0.975], horizons = horizon)
+avg_pinball_loss_qra.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_qra_rw_600_250' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+avg_pinball_loss_per_quantile_qra.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_qra_rw_600_250' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+avg_pinball_loss_overall_qra.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_overall_qra_rw_600_250' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
 
 """
 QRA for weekly forecasts 
@@ -573,7 +577,7 @@ def QRAQuantilePredictor(len_rw_individual_preds, weather_data):
 
     return eval_data_all_horizons
 
-preds_QRA_all = QRAQuantilePredictor(920, weather_data)
+preds_QRA_all = QRAQuantilePredictor(600, weather_data)
 preds_QRA_all[['0.025', '0.25', '0.5', '0.75', '0.975']] = preds_QRA_all[['0.025', '0.25', '0.5', '0.75', '0.975']].apply(lambda x: np.sort(x), axis = 1, raw = True)
 
 print(1)
