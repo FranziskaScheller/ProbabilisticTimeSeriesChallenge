@@ -127,7 +127,14 @@ def DataUpdaterWeather(update_date, real_obs):
                      'ens_iqr_025_075': 'ens_iqr_025_075_wind_10m', 'ens_iqr_01_09': 'ens_iqr_01_09_wind_10m',
                      'ens_1_decile': 'ens_1_decile_wind_10m', 'ens_9_decile': 'ens_9_decile_wind_10m',
                      'ens_median': 'ens_median_wind_10m', 'ens_min': 'ens_min_wind_10m', 'ens_max': 'ens_max_wind_10m'})
+
         weather_data = df_t_2m_mod
+
+        weather_data_update = weather_data[weather_data['init_tm'] == update_date]
+        weather_data = weather_data.iloc[0:64415]
+        weather_data = weather_data.dropna()
+        weather_data = weather_data.append(weather_data_update)
+        weather_data = weather_data.reset_index().drop(columns='index')
 
     else:
         df_wind_10m_mod = df_t_2m[
