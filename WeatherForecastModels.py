@@ -202,3 +202,276 @@ def QuantilePredictionEvaluator(predictions, quantile_levels, horizons):
     avg_pinball_loss_per_quantile = avg_pinball_loss[['0.025', '0.25', '0.5', '0.75', '0.975']].mean(axis = 0)
     avg_pinball_loss_overall = avg_pinball_loss_per_quantile.mean()
     return avg_pinball_loss, avg_pinball_loss_per_quantile, avg_pinball_loss_overall
+
+def RollingWindowQuantileCalculator(model, data, length_train_data, index_drop_na, horizon, emos_ind_boosting, considered_days):
+
+    ind = 1
+
+    for h in horizon:
+        data_h = data[(data['fcst_hour'] == h)]
+
+        len_data = len(data_h)
+        len_preds = len_data - length_train_data
+
+        # Dataframe that contains quantile predictions for the different horizons and test data times
+        #quantile_preds_rw_h = pd.DataFrame(data_h[['init_tm', 'obs_tm']].iloc[length_train_data:len_data-1], columns=['init_tm','obs_tm'])
+        quantile_preds_rw_h = pd.DataFrame(data_h[['init_tm', 'obs_tm']].iloc[length_train_data:len_data],
+                                           columns=['init_tm', 'obs_tm'])
+
+        quantile_preds_rw_h['horizon'] = h
+        quantile_preds_rw_h[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros((len(quantile_preds_rw_h), 5))
+
+        quantile_preds_rw_h = quantile_preds_rw_h.reset_index()
+        quantile_preds_rw_h = quantile_preds_rw_h.drop(columns='index')
+
+        for i in range(0, len_preds):
+
+            X_y_train = data_h.iloc[i:i+length_train_data]
+            X_y_train = X_y_train.dropna()
+            X_y_train = X_y_train[(X_y_train['init_tm'].apply(lambda x: x.to_pydatetime().month) <= (
+                            data_h['init_tm'].iloc[i + length_train_data] + timedelta(
+                            days=considered_days)).to_pydatetime().month) & (
+                            X_y_train['init_tm'].apply(lambda x: x.to_pydatetime().month) >= (
+                            data_h['init_tm'].iloc[i + length_train_data] + timedelta(
+                            days=considered_days)).to_pydatetime().month)]
+            X_train = X_y_train.drop(columns='obs')
+            y_train = X_y_train['obs']
+            time = data_h['init_tm'].iloc[i + length_train_data]
+            X_test = data_h.drop(columns=['obs', 'init_tm', 'fcst_hour', 'obs_tm']).iloc[i + length_train_data]
+
+            for q in quantile_levels:
+                if model == EMOS:
+                    quantile_preds_rw_h[str(q)][quantile_preds_rw_h['init_tm'] == time] = model(q, X_train.drop(
+                            columns=['init_tm', 'obs_tm']), y_train, X_test.drop(
+                            columns=['init_tm', 'obs_tm']).to_frame().T, emos_ind_boosting)
+
+                else:
+                    quantile_preds_rw_h[str(q)][quantile_preds_rw_h['init_tm'] == time] = model(q, X_train.drop(
+                            columns=['init_tm', 'fcst_hour', 'obs_tm']), y_train, X_test)
+
+        if ind == 1:
+                quantile_preds_rw = quantile_preds_rw_h
+        else:
+                quantile_preds_rw = quantile_preds_rw.append(quantile_preds_rw_h)
+
+        ind = ind + 1
+
+    quantile_preds_rw = quantile_preds_rw.dropna()
+    quantile_preds_rw = quantile_preds_rw.reset_index().drop(columns = 'index')
+
+    return quantile_preds_rw
+
+quantile_levels = [0.025, 0.25, 0.5, 0.75, 0.975]
+horizon = [36, 48, 60, 72, 84]
+
+def TotalQuantileCalculator(model, data, horizon, emos_ind_boosting):
+
+    ind = 1
+
+    for h in horizon:
+        data_h = data[(data['fcst_hour'] == h)]
+
+        len_data = len(data_h)
+        len_preds = 1
+
+        # Dataframe that contains quantile predictions for the different horizons and test data times
+        #quantile_preds_rw_h = pd.DataFrame(data_h[['init_tm', 'obs_tm']].iloc[length_train_data:len_data-1], columns=['init_tm','obs_tm'])
+        quantile_preds_rw_h = pd.DataFrame(data_h[['init_tm', 'obs_tm']].iloc[-1:len_data],
+                                           columns=['init_tm', 'obs_tm'])
+
+        quantile_preds_rw_h['horizon'] = h
+        quantile_preds_rw_h[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros((len(quantile_preds_rw_h), 5))
+
+        quantile_preds_rw_h = quantile_preds_rw_h.reset_index()
+        quantile_preds_rw_h = quantile_preds_rw_h.drop(columns='index')
+
+        i = 0
+        X_y_train = data_h.iloc[i:-1]
+        X_y_train = X_y_train.dropna()
+        X_y_train = X_y_train.reset_index().drop(columns='index')
+
+        X_train = X_y_train.drop(columns='obs')
+        y_train = X_y_train['obs']
+        time = data_h['init_tm'].iloc[-1]
+        X_test = data_h.drop(columns=['obs', 'init_tm', 'fcst_hour', 'obs_tm']).iloc[-1]
+
+        for q in quantile_levels:
+            if model == EMOS:
+                quantile_preds_rw_h[str(q)][quantile_preds_rw_h['init_tm'] == time] = model(q, X_train.drop(
+                            columns=['init_tm', 'obs_tm']), y_train, X_test.drop(
+                            columns=['init_tm', 'obs_tm']).to_frame().T, emos_ind_boosting)
+
+            else:
+                quantile_preds_rw_h[str(q)][quantile_preds_rw_h['init_tm'] == time] = model(q, X_train.drop(
+                            columns=['init_tm', 'fcst_hour', 'obs_tm']), y_train, X_test)
+
+        if ind == 1:
+            quantile_preds_rw = quantile_preds_rw_h
+        else:
+            quantile_preds_rw = quantile_preds_rw.append(quantile_preds_rw_h)
+
+        ind = ind + 1
+
+    return quantile_preds_rw
+
+
+def RollingWindowQuantileCalculatorAllModels(weather_data, len_rw_models, index_drop_na):
+
+    quantile_preds_rw_qrf = RollingWindowQuantileCalculator(QRF, weather_data, len_rw_models, index_drop_na=index_drop_na, horizon=horizon, emos_ind_boosting=False, considered_days = 366)
+    quantile_preds_rw_emos = RollingWindowQuantileCalculator(EMOS, weather_data, len_rw_models, index_drop_na=index_drop_na, horizon=horizon, emos_ind_boosting=False, considered_days = 366)
+    quantile_preds_rw_emos_boosting = RollingWindowQuantileCalculator(EMOS, weather_data, len_rw_models, index_drop_na=index_drop_na, horizon=horizon, emos_ind_boosting=True, considered_days = 366)
+    quantile_preds_rw_gbm = RollingWindowQuantileCalculator(GBM, weather_data, len_rw_models, index_drop_na=index_drop_na, horizon=horizon, emos_ind_boosting=False, considered_days = 366)
+
+    quantile_preds_rw_emos = quantile_preds_rw_emos.merge(weather_data[['obs', 'init_tm', 'obs_tm']],
+                                                          on=['init_tm', 'obs_tm'], how='left', validate='1:1')
+    quantile_preds_rw_emos_boosting = quantile_preds_rw_emos_boosting.merge(weather_data[['obs', 'init_tm', 'obs_tm']],
+                                                          on=['init_tm', 'obs_tm'], how='left', validate='1:1')
+    quantile_preds_rw_qrf = quantile_preds_rw_qrf.merge(weather_data[['obs', 'init_tm', 'obs_tm']],
+                                                          on=['init_tm', 'obs_tm'], how='left', validate='1:1')
+    quantile_preds_rw_gbm = quantile_preds_rw_gbm.merge(weather_data[['obs', 'init_tm', 'obs_tm']],
+                                                          on=['init_tm', 'obs_tm'], how='left', validate='1:1')
+
+    return quantile_preds_rw_qrf, quantile_preds_rw_emos, quantile_preds_rw_emos_boosting, quantile_preds_rw_gbm
+
+
+def QRAFitterAndEvaluator(len_rw_individual_preds, len_rw_qra_model):
+
+    quantile_preds_rw_qrf, quantile_preds_rw_emos, quantile_preds_rw_emos_boosting, quantile_preds_rw_gbm = RollingWindowQuantileCalculatorAllModels(
+        len_rw_individual_preds, index_drop_na = True)
+
+    ind = 0
+    for h in horizon:
+
+        quantile_preds_rw_qrf_h = quantile_preds_rw_qrf[(quantile_preds_rw_qrf['horizon'] == h)]
+        quantile_preds_rw_qrf_h = quantile_preds_rw_qrf_h.reset_index()
+        quantile_preds_rw_qrf_h = quantile_preds_rw_qrf_h.drop(columns='index')
+
+        quantile_preds_rw_emos_h = quantile_preds_rw_emos[(quantile_preds_rw_emos['horizon'] == h)]
+        quantile_preds_rw_emos_h = quantile_preds_rw_emos_h.reset_index()
+        quantile_preds_rw_emos_h = quantile_preds_rw_emos_h.drop(columns='index')
+
+        quantile_preds_rw_emos_boosting_h = quantile_preds_rw_emos_boosting[(quantile_preds_rw_emos_boosting['horizon'] == h)]
+        quantile_preds_rw_emos_boosting_h = quantile_preds_rw_emos_boosting_h.reset_index()
+        quantile_preds_rw_emos_boosting_h = quantile_preds_rw_emos_boosting_h.drop(columns='index')
+
+        quantile_preds_rw_gbm_h = quantile_preds_rw_gbm[(quantile_preds_rw_gbm['horizon'] == h)]
+        quantile_preds_rw_gbm_h = quantile_preds_rw_gbm_h.reset_index()
+        quantile_preds_rw_gbm_h = quantile_preds_rw_gbm_h.drop(columns='index')
+
+
+        eval_data = quantile_preds_rw_qrf_h[['init_tm', 'obs_tm', 'obs', 'horizon']].iloc[
+                    len_rw_qra_model:len(quantile_preds_rw_qrf_h)]
+        eval_data[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros((len(eval_data), 5))
+        eval_data = eval_data.reset_index()
+        eval_data = eval_data.drop(columns='index')
+
+        for i in range(0,len(quantile_preds_rw_qrf_h) - len_rw_qra_model-1):
+
+            for q in quantile_levels:
+
+                X = pd.DataFrame(quantile_preds_rw_qrf_h[str(q)].iloc[i:i + len_rw_qra_model + 1])
+                X = X.rename({str(q): str(q) + 'qrf' }, axis = 'columns')
+                X[str(q) + 'emos'] = quantile_preds_rw_emos_h[str(q)].iloc[i:i + len_rw_qra_model + 1]
+                X[str(q) + 'emos_boosting'] = quantile_preds_rw_emos_boosting_h[str(q)].iloc[i:i + len_rw_qra_model + 1]
+                #X[str(q) + 'gbm'] = quantile_preds_rw_gbm_h[str(q)].iloc[i:i + len_rw_qra_model + 1]
+                X_train = X.iloc[0:-1]
+                X_test = X.tail(1)
+                y = quantile_preds_rw_qrf_h['obs'].iloc[i:i + len_rw_qra_model + 1]
+                y_train = y.iloc[0:-1]
+                #X_y_train = X_train
+                #X_y_train['obs'] = y_train
+
+                qr = QuantileRegressor(quantile=q, alpha=0.2)
+                y_pred = qr.fit(X_train, y_train).predict(X_test)
+                #todo: falls das nicht besser wird vllt q's in X weglassen und nochmal probieren ob es an . lag in namen
+                # qr = smf.quantreg("obs ~ " + str(q) + 'qrf + ' + str(q) + 'emos + ' + str(q) + 'emos_boosting', X_y_train)
+                # res = qr.fit(q=q)
+                # y_pred = res.predict(X_test)
+
+                eval_data[str(q)].iloc[i] = y_pred
+
+        if ind == 0:
+            eval_data_all_horizons = eval_data
+            ind = 1
+        else:
+            eval_data_all_horizons = eval_data_all_horizons.append(eval_data)
+
+    # prevent quantile crossing
+    eval_data_all_horizons[['0.025', '0.25', '0.5', '0.75', '0.975']] = eval_data_all_horizons[
+        ['0.025', '0.25', '0.5', '0.75', '0.975']].apply(lambda x: np.sort(x), axis=1, raw=True)
+
+    eval_data_all_horizons = eval_data_all_horizons.dropna()
+    eval_data_all_horizons = eval_data_all_horizons.reset_index().drop(columns = 'index')
+
+    return eval_data_all_horizons
+
+def QRAQuantilePredictor(len_rw_individual_preds, weather_data):
+
+    quantile_preds_rw_qrf, quantile_preds_rw_emos, quantile_preds_rw_emos_boosting, quantile_preds_rw_gbm = RollingWindowQuantileCalculatorAllModels(
+        len_rw_individual_preds, index_drop_na = False)
+
+    # use all available weather data in the end to fit the last prediction model
+    quantile_preds_rw_qrf_all = TotalQuantileCalculator(QRF, weather_data, horizon=horizon, emos_ind_boosting=False)
+    quantile_preds_rw_emos_all = TotalQuantileCalculator(EMOS, weather_data, horizon=horizon, emos_ind_boosting=False)
+    quantile_preds_rw_emos_boosting_all = TotalQuantileCalculator(EMOS, weather_data, horizon=horizon, emos_ind_boosting=True)
+
+    ind = 0
+    for h in horizon:
+
+        quantile_preds_rw_qrf_h = quantile_preds_rw_qrf[(quantile_preds_rw_qrf['horizon'] == h)]
+        quantile_preds_rw_qrf_h = quantile_preds_rw_qrf_h.reset_index()
+        quantile_preds_rw_qrf_h = quantile_preds_rw_qrf_h.drop(columns='index')
+
+        quantile_preds_rw_emos_h = quantile_preds_rw_emos[(quantile_preds_rw_emos['horizon'] == h)]
+        quantile_preds_rw_emos_h = quantile_preds_rw_emos_h.reset_index()
+        quantile_preds_rw_emos_h = quantile_preds_rw_emos_h.drop(columns='index')
+
+        quantile_preds_rw_emos_boosting_h = quantile_preds_rw_emos_boosting[(quantile_preds_rw_emos_boosting['horizon'] == h)]
+        quantile_preds_rw_emos_boosting_h = quantile_preds_rw_emos_boosting_h.reset_index()
+        quantile_preds_rw_emos_boosting_h = quantile_preds_rw_emos_boosting_h.drop(columns='index')
+
+        quantile_preds_rw_gbm_h = quantile_preds_rw_gbm[(quantile_preds_rw_gbm['horizon'] == h)]
+        quantile_preds_rw_gbm_h = quantile_preds_rw_gbm_h.reset_index()
+        quantile_preds_rw_gbm_h = quantile_preds_rw_gbm_h.drop(columns='index')
+
+        quantile_preds_rw_qrf_all_h = quantile_preds_rw_qrf_all[(quantile_preds_rw_qrf_all['horizon'] == h)]
+        quantile_preds_rw_emos_all_h = quantile_preds_rw_emos_all[(quantile_preds_rw_emos_all['horizon'] == h)]
+        quantile_preds_rw_emos_boosting_all_h = quantile_preds_rw_emos_boosting_all[
+            (quantile_preds_rw_emos_boosting_all['horizon'] == h)]
+        #quantile_preds_rw_gbm_all_h = quantile_preds_rw_gbm_all[(quantile_preds_rw_gbm_all['horizon'] == h)]
+
+        eval_data = pd.DataFrame(quantile_preds_rw_qrf_all_h[['init_tm', 'obs_tm', 'horizon']])
+        eval_data[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros((1, 5))
+
+        for q in quantile_levels:
+
+            X = pd.DataFrame(quantile_preds_rw_qrf_h[str(q)])
+            X = X.rename({str(q): str(q) + 'qrf' }, axis = 'columns')
+            X[str(q) + 'emos'] = quantile_preds_rw_emos_h[str(q)]
+            X[str(q) + 'emos_boosting'] = quantile_preds_rw_emos_boosting_h[str(q)]
+            #X[str(q) + 'gbm'] = quantile_preds_rw_gbm_h[str(q)].iloc[i:i + len_rw_qra_model + 1]
+            X_train = X.iloc[0:-1]
+            X_test = pd.DataFrame(quantile_preds_rw_qrf_all_h[str(q)])
+            X_test = X_test.rename({str(q): str(q) + 'qrf' }, axis = 'columns')
+            X_test[str(q) + 'emos'] = quantile_preds_rw_emos_all_h[str(q)]
+            X_test[str(q) + 'emos_boosting'] = quantile_preds_rw_emos_boosting_all_h[str(q)]
+            y_train = quantile_preds_rw_qrf_h['obs'].iloc[0:-1]
+
+            qr = QuantileRegressor(quantile=q, alpha=0)
+            y_pred = qr.fit(X_train, y_train).predict(X_test)
+            #todo: falls das nicht besser wird vllt q's in X weglassen und nochmal probieren ob es an . lag in namen
+            # qr = smf.quantreg("obs ~ " + str(q) + 'qrf + ' + str(q) + 'emos + ' + str(q) + 'emos_boosting', X_y_train)
+            # res = qr.fit(q=q)
+            # y_pred = res.predict(X_test)
+
+            eval_data[str(q)].iloc[0] = y_pred
+
+        if ind == 0:
+            eval_data_all_horizons = eval_data
+            ind = 1
+        else:
+            eval_data_all_horizons = eval_data_all_horizons.append(eval_data)
+
+    #avg_pinball_loss, avg_pinball_loss_per_quantile, avg_pinball_loss_overall = QuantilePredictionEvaluator(predictions, quantile_levels, horizon)
+
+    return eval_data_all_horizons
