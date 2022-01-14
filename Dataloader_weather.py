@@ -175,6 +175,11 @@ def DataUpdaterWeather(update_date, real_obs):
                      'ens_median': 'ens_median_wind_10m', 'ens_min': 'ens_min_wind_10m', 'ens_max': 'ens_max_wind_10m'})
 
         weather_data = df_wind_10m_mod
+        weather_data_update = weather_data[weather_data['init_tm'] == update_date]
+        weather_data = weather_data.iloc[0:64415]
+        weather_data = weather_data.dropna()
+        weather_data = weather_data.append(weather_data_update)
+        weather_data = weather_data.reset_index().drop(columns='index')
 
     return weather_data, df_t_2m, df_wind_10m
 
@@ -238,7 +243,7 @@ def DataPreparer(last_wednesday):
     list_variable_names = ["clct", "mslp", "t_2m", "wind_mean_10m"]
     indicator = 0
     for var_name in list_variable_names:
-        file_name = '/Users/franziska/PycharmProjects/ProbabilisticTimeSeriesChallenge/kit-weather-ensemble-point-forecast-berlin/icon-eu-eps_' + str(last_wednesday.strftime("%Y%m%d%H")) + '_' + var_name + '_Berlin.txt'
+        file_name = '/Users/franziska/PycharmProjects/ProbabilisticTimeSeriesChallenge/kit-weather-ensemble-point-forecast-berlin-old/icon-eu-eps_' + str(last_wednesday.strftime("%Y%m%d%H")) + '_' + var_name + '_Berlin.txt'
         data = pd.read_csv(file_name, sep=",", header=None)
         data = data[4:]
         data = data[0].str.split('|', 42, expand=True)

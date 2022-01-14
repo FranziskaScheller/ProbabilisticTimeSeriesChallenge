@@ -162,10 +162,10 @@ def EMOS_wind(q, X_train, y_train, X_test, ind_boosting):
 """
 Gradient Boosting with Quantile Loss 
 """
-def GBM(q, X_train, y_train, X_test):
+def GBM(q, X_train, y_train, X_test, min_sample_size, n_estimators):
     mod = GradientBoostingRegressor(loss='quantile', alpha=q,
-                                    n_estimators=15, max_depth=8,
-                                    learning_rate=.01, min_samples_leaf=10,
+                                    n_estimators=n_estimators, max_depth=8,
+                                    learning_rate=.01, min_samples_leaf=min_sample_size,
                                     min_samples_split=15)
     # mod = GradientBoostingRegressor(loss='quantile', alpha=q,
     #                                 n_estimators=10, max_depth=5,
@@ -178,10 +178,10 @@ def GBM(q, X_train, y_train, X_test):
 """
 Quantile Random Forests 
 """
-def QRF(q, X_train, y_train, X_test):
+def QRF(q, X_train, y_train, X_test, min_sample_size, n_estimators):
     rfqr = RandomForestQuantileRegressor(
         #random_state=0,
-        min_samples_split=5, n_estimators=100)
+        min_samples_split=min_sample_size, n_estimators=n_estimators)
     rfqr_fit = rfqr.fit(X_train, y_train)
     pred = rfqr.predict(X_test.array.reshape(1, -1), quantile=(q*100))
 
@@ -205,7 +205,7 @@ def QuantilePredictionEvaluator(predictions, quantile_levels, horizons):
     avg_pinball_loss_overall = avg_pinball_loss_per_quantile.mean()
     return avg_pinball_loss, avg_pinball_loss_per_quantile, avg_pinball_loss_overall
 
-def RollingWindowQuantileCalculator(model, data, length_train_data, index_drop_na, horizon, emos_ind_boosting, considered_days):
+def RollingWindowQuantileCalculator(model, data, length_train_data, index_drop_na, horizon, emos_ind_boosting, considered_days, min_sample_size, n_estimator):
 
     ind = 1
 
@@ -246,10 +246,13 @@ def RollingWindowQuantileCalculator(model, data, length_train_data, index_drop_n
                     quantile_preds_rw_h[str(q)][quantile_preds_rw_h['init_tm'] == time] = model(q, X_train.drop(
                             columns=['init_tm', 'obs_tm']), y_train, X_test.drop(
                             columns=['init_tm', 'obs_tm']).to_frame().T, emos_ind_boosting)
-
+                elif model == EMOS_wind:
+                            quantile_preds_rw_h[str(q)][quantile_preds_rw_h['init_tm'] == time] = model(q, X_train.drop(
+                            columns=['init_tm', 'obs_tm']), y_train, X_test.drop(
+                            columns=['init_tm', 'obs_tm']).to_frame().T, emos_ind_boosting)
                 else:
                     quantile_preds_rw_h[str(q)][quantile_preds_rw_h['init_tm'] == time] = model(q, X_train.drop(
-                            columns=['init_tm', 'fcst_hour', 'obs_tm']), y_train, X_test)
+                            columns=['init_tm', 'fcst_hour', 'obs_tm']), y_train, X_test, min_sample_size, n_estimator)
 
         if ind == 1:
                 quantile_preds_rw = quantile_preds_rw_h
@@ -321,16 +324,16 @@ def RollingWindowQuantileCalculatorAllModels(weather_data, len_rw_models, index_
 
     quantile_preds_rw_qrf = RollingWindowQuantileCalculator(QRF, weather_data, len_rw_models,
                                                             index_drop_na=index_drop_na, horizon=horizon,
-                                                            emos_ind_boosting=False, considered_days=366)
+                                                            emos_ind_boosting=False, considered_days=366, min_sample_size = 0, n_estimator = 0)
     quantile_preds_rw_gbm = RollingWindowQuantileCalculator(GBM, weather_data, len_rw_models,
                                                             index_drop_na=index_drop_na, horizon=horizon,
-                                                            emos_ind_boosting=False, considered_days=366)
+                                                            emos_ind_boosting=False, considered_days=366, min_sample_size = 0, n_estimator = 0)
     if ind_wind == False:
-        quantile_preds_rw_emos = RollingWindowQuantileCalculator(EMOS, weather_data, len_rw_models, index_drop_na=index_drop_na, horizon=horizon, emos_ind_boosting=False, considered_days = 366)
-        quantile_preds_rw_emos_boosting = RollingWindowQuantileCalculator(EMOS, weather_data, len_rw_models, index_drop_na=index_drop_na, horizon=horizon, emos_ind_boosting=True, considered_days = 366)
+        quantile_preds_rw_emos = RollingWindowQuantileCalculator(EMOS, weather_data, len_rw_models, index_drop_na=index_drop_na, horizon=horizon, emos_ind_boosting=False, considered_days = 366, min_sample_size = 0, n_estimator = 0)
+        quantile_preds_rw_emos_boosting = RollingWindowQuantileCalculator(EMOS, weather_data, len_rw_models, index_drop_na=index_drop_na, horizon=horizon, emos_ind_boosting=True, considered_days = 366, min_sample_size = 0, n_estimator = 0)
     else:
-        quantile_preds_rw_emos = RollingWindowQuantileCalculator(EMOS_wind, weather_data, len_rw_models, index_drop_na=index_drop_na, horizon=horizon, emos_ind_boosting=False, considered_days = 366)
-        quantile_preds_rw_emos_boosting = RollingWindowQuantileCalculator(EMOS_wind, weather_data, len_rw_models, index_drop_na=index_drop_na, horizon=horizon, emos_ind_boosting=True, considered_days = 366)
+        quantile_preds_rw_emos = RollingWindowQuantileCalculator(EMOS_wind, weather_data, len_rw_models, index_drop_na=index_drop_na, horizon=horizon, emos_ind_boosting=False, considered_days = 366, min_sample_size = 0, n_estimator = 0)
+        quantile_preds_rw_emos_boosting = RollingWindowQuantileCalculator(EMOS_wind, weather_data, len_rw_models, index_drop_na=index_drop_na, horizon=horizon, emos_ind_boosting=True, considered_days = 366, min_sample_size = 0, n_estimator = 0)
 
     quantile_preds_rw_emos = quantile_preds_rw_emos.merge(weather_data[['obs', 'init_tm', 'obs_tm']],
                                                           on=['init_tm', 'obs_tm'], how='left', validate='1:1')
@@ -344,7 +347,7 @@ def RollingWindowQuantileCalculatorAllModels(weather_data, len_rw_models, index_
     return quantile_preds_rw_qrf, quantile_preds_rw_emos, quantile_preds_rw_emos_boosting, quantile_preds_rw_gbm
 
 
-def QRAFitterAndEvaluator(weather_data, len_rw_individual_preds, len_rw_qra_model, ind_wind):
+def QRAFitterAndEvaluator(weather_data, len_rw_individual_preds, len_rw_qra_model, ind_wind, alpha_qr):
 
     if ind_wind == True:
         quantile_preds_rw_qrf, quantile_preds_rw_emos, quantile_preds_rw_emos_boosting, quantile_preds_rw_gbm = RollingWindowQuantileCalculatorAllModels(
@@ -394,7 +397,7 @@ def QRAFitterAndEvaluator(weather_data, len_rw_individual_preds, len_rw_qra_mode
                 #X_y_train = X_train
                 #X_y_train['obs'] = y_train
 
-                qr = QuantileRegressor(quantile=q, alpha=0.2)
+                qr = QuantileRegressor(quantile=q, alpha=alpha_qr)
                 y_pred = qr.fit(X_train, y_train).predict(X_test)
                 #todo: falls das nicht besser wird vllt q's in X weglassen und nochmal probieren ob es an . lag in namen
                 # qr = smf.quantreg("obs ~ " + str(q) + 'qrf + ' + str(q) + 'emos + ' + str(q) + 'emos_boosting', X_y_train)
@@ -490,6 +493,9 @@ def QRAQuantilePredictor(len_rw_individual_preds, weather_data, ind_wind):
             ind = 1
         else:
             eval_data_all_horizons = eval_data_all_horizons.append(eval_data)
+
+    eval_data_all_horizons[['0.025', '0.25', '0.5', '0.75', '0.975']] = eval_data_all_horizons[
+        ['0.025', '0.25', '0.5', '0.75', '0.975']].apply(lambda x: np.sort(x), axis=1, raw=True)
 
     #avg_pinball_loss, avg_pinball_loss_per_quantile, avg_pinball_loss_overall = QuantilePredictionEvaluator(predictions, quantile_levels, horizon)
 
