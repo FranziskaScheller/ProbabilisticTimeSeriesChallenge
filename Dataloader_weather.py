@@ -292,4 +292,4 @@ def DataPreparer(last_wednesday):
 
     return data_full
 
-print(12345)
+print(123456)
