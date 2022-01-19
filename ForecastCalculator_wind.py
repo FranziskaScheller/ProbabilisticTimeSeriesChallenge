@@ -33,8 +33,8 @@ scoringRules = rpackages.importr('scoringRules')
 crch = rpackages.importr('crch')
 """ load wind data """
 #weather_data = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'))
-#weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather('2021-12-22', 'wind')
-weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'), 'wind')
+weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather('2022-01-12', 'wind')
+#weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'), 'wind')
 """
 First visualize real wind observations to get a feeling for the data
 """
@@ -281,8 +281,8 @@ for min_sample_size in min_sample_sizes:
     for n_estimator in n_estimators:
         avg_pinball_loss_trees_hyperparameter['min_sample_sizes'].iloc[i] = min_sample_size
         avg_pinball_loss_trees_hyperparameter['min_sample_sizes'].iloc[i+1] = min_sample_size
-        avg_pinball_loss_trees_hyperparameter['n_estimator'].iloc[i] = n_estimator
-        avg_pinball_loss_trees_hyperparameter['n_estimator'].iloc[i+1] = n_estimator
+        avg_pinball_loss_trees_hyperparameter['n_estimators'].iloc[i] = n_estimator
+        avg_pinball_loss_trees_hyperparameter['n_estimators'].iloc[i+1] = n_estimator
         avg_pinball_loss_trees_hyperparameter['model'].iloc[i] = 'QRF'
         avg_pinball_loss_trees_hyperparameter['model'].iloc[i+1] = 'GBM'
 
@@ -385,7 +385,7 @@ Grid search of parameters with rolling window evaluation
 #     average_qs_len_months['QRF'][average_qs_len_months['nbr_considered_months'] == m] = avg_pinball_loss_overall_qrf_d
 #
 #
-
+# GBM: 20, 400; RFS: 20, 400
 alphas = [0, 0.05, 0.1, 0.15, 0.2]
 avg_pinball_loss_alphas = pd.DataFrame(alphas, columns=['alpha'])
 for alpha in alphas:

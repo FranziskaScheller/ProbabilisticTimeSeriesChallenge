@@ -291,5 +291,3 @@ def DataPreparer(last_wednesday):
     data_full.to_csv(file_path, index = False)
 
     return data_full
-
-print(123456)
