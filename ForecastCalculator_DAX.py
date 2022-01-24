@@ -272,11 +272,11 @@ rpy2.robjects.numpy2ri.activate()
 
 rugarch = rpackages.importr('rugarch')
 
-#GARCH(1,1)
+#GARCH(1,3)
 variance_model = robjects.ListVector({'model': "sGARCH",
                                       'garchOrder': robjects.IntVector([1, 3])})
 
-#ARMA(1,1)
+#ARMA(3,3)
 mean_model = robjects.ListVector({'armaOrder': robjects.IntVector([3, 3]),
                                   'include.mean': True})
 

@@ -40,8 +40,8 @@ crch = rpackages.importr('crch')
 load weather data 
 """
 # load data frame weather_data with r_icon_eps weather data and ensemble forecasts from 'YYYY-MM-DD'
-#weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather('2021-12-14', 'temperature')
-weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'), 'temperature')
+weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather('2022-01-19', 'temperature')
+#weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'), 'temperature')
 """
 First visualize real temperature observations to get a feeling for the data
 """
@@ -248,64 +248,62 @@ Use average over linear quantile scores since that's an approximation of the CRP
 #quantile_preds_rw_emos_submissions[['0.025', '0.25', '0.5', '0.75', '0.975']].to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/temp_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
 
 # # Calculate Quantile Predictions with Rolling Window Approach # 600
-min_sample_sizes = [10, 20]
-n_estimators = [200, 400]
-avg_pinball_loss_trees_hyperparameter = pd.DataFrame(np.zeros((len(min_sample_sizes) * len(n_estimators) * 2, 4)), columns=['model','min_sample_sizes', 'n_estimators', 'avg_quantile_loss'])
+# min_sample_sizes = [10, 20]
+# n_estimators = [200, 400]
+# avg_pinball_loss_trees_hyperparameter = pd.DataFrame(np.zeros((len(min_sample_sizes) * len(n_estimators) * 2, 4)), columns=['model','min_sample_sizes', 'n_estimators', 'avg_quantile_loss'])
+#
+# i = 0
+# for min_sample_size in min_sample_sizes:
+#     for n_estimator in n_estimators:
+#         avg_pinball_loss_trees_hyperparameter['min_sample_sizes'].iloc[i] = min_sample_size
+#         avg_pinball_loss_trees_hyperparameter['min_sample_sizes'].iloc[i+1] = min_sample_size
+#         avg_pinball_loss_trees_hyperparameter['n_estimators'].iloc[i] = n_estimator
+#         avg_pinball_loss_trees_hyperparameter['n_estimators'].iloc[i+1] = n_estimator
+#         avg_pinball_loss_trees_hyperparameter['model'].iloc[i] = 'QRF'
+#         avg_pinball_loss_trees_hyperparameter['model'].iloc[i+1] = 'GBM'
+#
+#         quantile_preds_rw_qrf = RollingWindowQuantileCalculator(QRF, weather_data, 750, index_drop_na=True, horizon=horizon, emos_ind_boosting=False, considered_days = 366, min_sample_size = min_sample_size, n_estimator = n_estimator)
+#         quantile_preds_rw_gbm = RollingWindowQuantileCalculator(GBM, weather_data, 750, index_drop_na=True, horizon=horizon, emos_ind_boosting=False, considered_days = 366, min_sample_size = min_sample_size, n_estimator = n_estimator)
+#
+#         quantile_preds_rw_qrf = quantile_preds_rw_qrf.merge(weather_data[['obs', 'init_tm', 'obs_tm']],
+#                                                             on=['init_tm', 'obs_tm'], how='left', validate='1:1')
+#         quantile_preds_rw_qrf = quantile_preds_rw_qrf.dropna()
+#         quantile_preds_rw_qrf = quantile_preds_rw_qrf.reset_index().drop(columns = 'index')
+#         avg_pinball_loss_qrf, avg_pinball_loss_per_quantile_qrf, avg_pinball_loss_overall_qrf = QuantilePredictionEvaluator(quantile_preds_rw_qrf, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
+#
+#         quantile_preds_rw_gbm = quantile_preds_rw_gbm.merge(weather_data[['obs', 'init_tm', 'obs_tm']], on=['init_tm', 'obs_tm'], how='left', validate='1:1')
+#         quantile_preds_rw_gbm = quantile_preds_rw_gbm.dropna()
+#         quantile_preds_rw_gbm = quantile_preds_rw_gbm.reset_index().drop(columns = 'index')
+#         avg_pinball_loss_gbm, avg_pinball_loss_per_quantile_gbm, avg_pinball_loss_overall_gbm = QuantilePredictionEvaluator(quantile_preds_rw_gbm, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
+#
+#         avg_pinball_loss_trees_hyperparameter['avg_quantile_loss'].iloc[i] = avg_pinball_loss_overall_qrf
+#         avg_pinball_loss_trees_hyperparameter['avg_quantile_loss'].iloc[i+1] = avg_pinball_loss_overall_gbm
+#
+#         i = i + 2
 
-i = 0
-for min_sample_size in min_sample_sizes:
-    for n_estimator in n_estimators:
-        avg_pinball_loss_trees_hyperparameter['min_sample_sizes'].iloc[i] = min_sample_size
-        avg_pinball_loss_trees_hyperparameter['min_sample_sizes'].iloc[i+1] = min_sample_size
-        avg_pinball_loss_trees_hyperparameter['n_estimators'].iloc[i] = n_estimator
-        avg_pinball_loss_trees_hyperparameter['n_estimators'].iloc[i+1] = n_estimator
-        avg_pinball_loss_trees_hyperparameter['model'].iloc[i] = 'QRF'
-        avg_pinball_loss_trees_hyperparameter['model'].iloc[i+1] = 'GBM'
-
-        quantile_preds_rw_qrf = RollingWindowQuantileCalculator(QRF, weather_data, 750, index_drop_na=True, horizon=horizon, emos_ind_boosting=False, considered_days = 366, min_sample_size = min_sample_size, n_estimator = n_estimator)
-        quantile_preds_rw_gbm = RollingWindowQuantileCalculator(GBM, weather_data, 750, index_drop_na=True, horizon=horizon, emos_ind_boosting=False, considered_days = 366, min_sample_size = min_sample_size, n_estimator = n_estimator)
-
-        quantile_preds_rw_qrf = quantile_preds_rw_qrf.merge(weather_data[['obs', 'init_tm', 'obs_tm']],
-                                                            on=['init_tm', 'obs_tm'], how='left', validate='1:1')
-        quantile_preds_rw_qrf = quantile_preds_rw_qrf.dropna()
-        quantile_preds_rw_qrf = quantile_preds_rw_qrf.reset_index().drop(columns = 'index')
-        avg_pinball_loss_qrf, avg_pinball_loss_per_quantile_qrf, avg_pinball_loss_overall_qrf = QuantilePredictionEvaluator(quantile_preds_rw_qrf, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
-
-        quantile_preds_rw_gbm = quantile_preds_rw_gbm.merge(weather_data[['obs', 'init_tm', 'obs_tm']], on=['init_tm', 'obs_tm'], how='left', validate='1:1')
-        quantile_preds_rw_gbm = quantile_preds_rw_gbm.dropna()
-        quantile_preds_rw_gbm = quantile_preds_rw_gbm.reset_index().drop(columns = 'index')
-        avg_pinball_loss_gbm, avg_pinball_loss_per_quantile_gbm, avg_pinball_loss_overall_gbm = QuantilePredictionEvaluator(quantile_preds_rw_gbm, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
-
-        avg_pinball_loss_trees_hyperparameter['avg_quantile_loss'].iloc[i] = avg_pinball_loss_overall_qrf
-        avg_pinball_loss_trees_hyperparameter['avg_quantile_loss'].iloc[i+1] = avg_pinball_loss_overall_gbm
-
-        i = i + 2
-
-avg_pinball_loss_trees_hyperparameter.to_csv('/Users/franziska/Dropbox/DataPTSFC/mean_quantile_scores_rw_hyperparameter_choice_750_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-# todo: choice of smalles value
+#avg_pinball_loss_trees_hyperparameter.to_csv('/Users/franziska/Dropbox/DataPTSFC/mean_quantile_scores_rw_hyperparameter_choice_750_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
 
 min_sample_size_gbm = 10
 min_sample_size_qrf = 10
 n_estimator_gbm = 400
 n_estimator_qrf = 200
 
-# quantile_preds_rw_emos = RollingWindowQuantileCalculator(EMOS, weather_data, 750, index_drop_na=True, horizon=horizon, emos_ind_boosting=False, considered_days = 366, min_sample_size = 0, n_estimator = 0)
-# quantile_preds_rw_emos_boosting = RollingWindowQuantileCalculator(EMOS, weather_data, 750, index_drop_na=True, horizon=horizon, emos_ind_boosting=True, considered_days = 366, min_sample_size = 0, n_estimator = 0)
-#quantile_preds_rw_qrf = RollingWindowQuantileCalculator(QRF, weather_data, 750, index_drop_na=True, horizon=horizon, emos_ind_boosting=False, considered_days = 366, min_sample_size, n_estimators, min_sample_size = 0, n_estimator = 0)
-#quantile_preds_rw_gbm = RollingWindowQuantileCalculator(GBM, weather_data, 750, index_drop_na=True, horizon=horizon, emos_ind_boosting=False, considered_days = 366, min_sample_size = 0, n_estimator = 0)
+#quantile_preds_rw_emos = RollingWindowQuantileCalculator(EMOS, weather_data, 750, index_drop_na=True, horizon=horizon, emos_ind_boosting=False, considered_days = 366, min_sample_size = 0, n_estimator = 0)
+#quantile_preds_rw_emos_boosting = RollingWindowQuantileCalculator(EMOS, weather_data, 750, index_drop_na=True, horizon=horizon, emos_ind_boosting=True, considered_days = 366, min_sample_size = 0, n_estimator = 0)
+quantile_preds_rw_qrf = RollingWindowQuantileCalculator(QRF, weather_data, 750, index_drop_na=True, horizon=horizon, emos_ind_boosting=False, considered_days = 366, min_sample_size = min_sample_size_qrf, n_estimator = n_estimator_qrf)
+quantile_preds_rw_gbm = RollingWindowQuantileCalculator(GBM, weather_data, 750, index_drop_na=True, horizon=horizon, emos_ind_boosting=False, considered_days = 366, min_sample_size = min_sample_size_gbm, n_estimator = n_estimator_gbm)
 
-# # # #
-# # # # # Evaluate all rolling window predictions
+# # # # Evaluate all rolling window predictions
 # quantile_preds_rw_emos = quantile_preds_rw_emos.merge(weather_data[['obs', 'init_tm', 'obs_tm']], on = ['init_tm', 'obs_tm'], how = 'left', validate = '1:1')
 # quantile_preds_rw_emos = quantile_preds_rw_emos.dropna()
 # quantile_preds_rw_emos = quantile_preds_rw_emos.reset_index().drop(columns = 'index')
 # avg_pinball_loss_emos, avg_pinball_loss_per_quantile_emos, avg_pinball_loss_overall_emos = QuantilePredictionEvaluator(quantile_preds_rw_emos, quantile_levels = [0.025, 0.25, 0.5, 0.75, 0.975], horizons = horizon)
-# # #
+#
 # quantile_preds_rw_emos.to_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_emos_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
 # avg_pinball_loss_emos.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_emos_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
 # avg_pinball_loss_per_quantile_emos.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_emos_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-# #avg_pinball_loss_overall_emos.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_overall_emos_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-# # #
+# avg_pinball_loss_overall_emos.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_overall_emos_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+# # # #
 # quantile_preds_rw_emos_boosting = quantile_preds_rw_emos_boosting.merge(weather_data[['obs', 'init_tm', 'obs_tm']], on = ['init_tm', 'obs_tm'], how='left', validate='1:1')
 # quantile_preds_rw_emos_boosting = quantile_preds_rw_emos_boosting.dropna()
 # quantile_preds_rw_emos_boosting = quantile_preds_rw_emos_boosting.reset_index().drop(columns = 'index')
@@ -316,25 +314,25 @@ n_estimator_qrf = 200
 # avg_pinball_loss_per_quantile_emos_boosting.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_emos_boosting_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
 # # # avg_pinball_loss_overall_emos_boosting.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_overall_emos_boosting_700' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
 # # #
-# quantile_preds_rw_gbm = quantile_preds_rw_gbm.merge(weather_data[['obs', 'init_tm', 'obs_tm']], on=['init_tm', 'obs_tm'], how='left', validate='1:1')
-# quantile_preds_rw_gbm = quantile_preds_rw_gbm.dropna()
-# quantile_preds_rw_gbm = quantile_preds_rw_gbm.reset_index().drop(columns = 'index')
-# avg_pinball_loss_gbm, avg_pinball_loss_per_quantile_gbm, avg_pinball_loss_overall_gbm = QuantilePredictionEvaluator(quantile_preds_rw_gbm, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
+quantile_preds_rw_gbm = quantile_preds_rw_gbm.merge(weather_data[['obs', 'init_tm', 'obs_tm']], on=['init_tm', 'obs_tm'], how='left', validate='1:1')
+quantile_preds_rw_gbm = quantile_preds_rw_gbm.dropna()
+quantile_preds_rw_gbm = quantile_preds_rw_gbm.reset_index().drop(columns = 'index')
+avg_pinball_loss_gbm, avg_pinball_loss_per_quantile_gbm, avg_pinball_loss_overall_gbm = QuantilePredictionEvaluator(quantile_preds_rw_gbm, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
 # # #
-# quantile_preds_rw_gbm.to_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_gbm_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-# avg_pinball_loss_gbm.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_gbm_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-# avg_pinball_loss_per_quantile_gbm.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_gbm_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-# #avg_pinball_loss_overall_gbm.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_overall_gbm_700' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-# # #
-# quantile_preds_rw_qrf = quantile_preds_rw_qrf.merge(weather_data[['obs', 'init_tm', 'obs_tm']], on=['init_tm', 'obs_tm'], how='left', validate='1:1')
-# quantile_preds_rw_qrf = quantile_preds_rw_qrf.dropna()
-# quantile_preds_rw_qrf = quantile_preds_rw_qrf.reset_index().drop(columns = 'index')
-# avg_pinball_loss_qrf, avg_pinball_loss_per_quantile_qrf, avg_pinball_loss_overall_qrf = QuantilePredictionEvaluator(quantile_preds_rw_qrf, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
-# # #
-# quantile_preds_rw_qrf.to_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_qrf_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-# avg_pinball_loss_qrf.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_qrf_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-# avg_pinball_loss_per_quantile_qrf.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_qrf_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-# avg_pinball_loss_overall_qrf.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_overall_qrf_700' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+quantile_preds_rw_gbm.to_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_gbm_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+avg_pinball_loss_gbm.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_gbm_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+avg_pinball_loss_per_quantile_gbm.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_gbm_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+avg_pinball_loss_overall_gbm.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_overall_gbm_700' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+
+quantile_preds_rw_qrf = quantile_preds_rw_qrf.merge(weather_data[['obs', 'init_tm', 'obs_tm']], on=['init_tm', 'obs_tm'], how='left', validate='1:1')
+quantile_preds_rw_qrf = quantile_preds_rw_qrf.dropna()
+quantile_preds_rw_qrf = quantile_preds_rw_qrf.reset_index().drop(columns = 'index')
+avg_pinball_loss_qrf, avg_pinball_loss_per_quantile_qrf, avg_pinball_loss_overall_qrf = QuantilePredictionEvaluator(quantile_preds_rw_qrf, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
+
+quantile_preds_rw_qrf.to_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_qrf_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+avg_pinball_loss_qrf.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_qrf_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+avg_pinball_loss_per_quantile_qrf.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_qrf_750' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+avg_pinball_loss_overall_qrf.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_overall_qrf_700' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
 
 """
 Grid search of parameters with rolling window evaluation 

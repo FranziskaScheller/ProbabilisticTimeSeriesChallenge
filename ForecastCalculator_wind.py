@@ -33,8 +33,8 @@ scoringRules = rpackages.importr('scoringRules')
 crch = rpackages.importr('crch')
 """ load wind data """
 #weather_data = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'))
-weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather('2022-01-12', 'wind')
-#weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'), 'wind')
+#weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather('2022-01-12', 'wind')
+weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'), 'wind')
 """
 First visualize real wind observations to get a feeling for the data
 """
