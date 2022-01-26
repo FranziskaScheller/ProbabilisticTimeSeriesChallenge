@@ -250,6 +250,7 @@ for i in range(1, 6):
         estimated_params[str(i)][estimated_params['quantile'] == str(q)] = percentile_q
 
 estimated_params.to_csv('/Users/franziska/Dropbox/DataPTSFC/Submissions/DAX_predictions' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+estimated_params_garch = estimated_params
 # evaluate with crps
 # scoringRules = rpackages.importr('scoringRules')
 # crps_fun = scoringRules.crps

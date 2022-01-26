@@ -322,18 +322,31 @@ def TotalQuantileCalculator(model, data, horizon, emos_ind_boosting):
 
 def RollingWindowQuantileCalculatorAllModels(weather_data, len_rw_models, index_drop_na, ind_wind):
 
-    quantile_preds_rw_qrf = RollingWindowQuantileCalculator(QRF, weather_data, len_rw_models,
-                                                            index_drop_na=index_drop_na, horizon=horizon,
-                                                            emos_ind_boosting=False, considered_days=366, min_sample_size = 0, n_estimator = 0)
-    quantile_preds_rw_gbm = RollingWindowQuantileCalculator(GBM, weather_data, len_rw_models,
-                                                            index_drop_na=index_drop_na, horizon=horizon,
-                                                            emos_ind_boosting=False, considered_days=366, min_sample_size = 0, n_estimator = 0)
     if ind_wind == False:
         quantile_preds_rw_emos = RollingWindowQuantileCalculator(EMOS, weather_data, len_rw_models, index_drop_na=index_drop_na, horizon=horizon, emos_ind_boosting=False, considered_days = 366, min_sample_size = 0, n_estimator = 0)
         quantile_preds_rw_emos_boosting = RollingWindowQuantileCalculator(EMOS, weather_data, len_rw_models, index_drop_na=index_drop_na, horizon=horizon, emos_ind_boosting=True, considered_days = 366, min_sample_size = 0, n_estimator = 0)
+
+        min_sample_size_gbm = 10
+        min_sample_size_qrf = 10
+        n_estimator_gbm = 400
+        n_estimator_qrf = 200
+
     else:
         quantile_preds_rw_emos = RollingWindowQuantileCalculator(EMOS_wind, weather_data, len_rw_models, index_drop_na=index_drop_na, horizon=horizon, emos_ind_boosting=False, considered_days = 366, min_sample_size = 0, n_estimator = 0)
         quantile_preds_rw_emos_boosting = RollingWindowQuantileCalculator(EMOS_wind, weather_data, len_rw_models, index_drop_na=index_drop_na, horizon=horizon, emos_ind_boosting=True, considered_days = 366, min_sample_size = 0, n_estimator = 0)
+
+        min_sample_size_gbm = 20
+        min_sample_size_qrf = 20
+        n_estimator_gbm = 400
+        n_estimator_qrf = 400
+
+
+    quantile_preds_rw_qrf = RollingWindowQuantileCalculator(QRF, weather_data, len_rw_models,
+                                                            index_drop_na=index_drop_na, horizon=horizon,
+                                                            emos_ind_boosting=False, considered_days=366, min_sample_size = min_sample_size_qrf, n_estimator = n_estimator_qrf)
+    # quantile_preds_rw_gbm = RollingWindowQuantileCalculator(GBM, weather_data, len_rw_models,
+    #                                                         index_drop_na=index_drop_na, horizon=horizon,
+    #                                                         emos_ind_boosting=False, considered_days=366, min_sample_size = min_sample_size_gbm, n_estimator = n_estimator_gbm)
 
     quantile_preds_rw_emos = quantile_preds_rw_emos.merge(weather_data[['obs', 'init_tm', 'obs_tm']],
                                                           on=['init_tm', 'obs_tm'], how='left', validate='1:1')
@@ -341,19 +354,19 @@ def RollingWindowQuantileCalculatorAllModels(weather_data, len_rw_models, index_
                                                           on=['init_tm', 'obs_tm'], how='left', validate='1:1')
     quantile_preds_rw_qrf = quantile_preds_rw_qrf.merge(weather_data[['obs', 'init_tm', 'obs_tm']],
                                                           on=['init_tm', 'obs_tm'], how='left', validate='1:1')
-    quantile_preds_rw_gbm = quantile_preds_rw_gbm.merge(weather_data[['obs', 'init_tm', 'obs_tm']],
-                                                          on=['init_tm', 'obs_tm'], how='left', validate='1:1')
+    # quantile_preds_rw_gbm = quantile_preds_rw_gbm.merge(weather_data[['obs', 'init_tm', 'obs_tm']],
+    #                                                       on=['init_tm', 'obs_tm'], how='left', validate='1:1')
 
-    return quantile_preds_rw_qrf, quantile_preds_rw_emos, quantile_preds_rw_emos_boosting, quantile_preds_rw_gbm
+    return quantile_preds_rw_qrf, quantile_preds_rw_emos, quantile_preds_rw_emos_boosting
 
 
 def QRAFitterAndEvaluator(weather_data, len_rw_individual_preds, len_rw_qra_model, ind_wind, alpha_qr):
 
     if ind_wind == True:
-        quantile_preds_rw_qrf, quantile_preds_rw_emos, quantile_preds_rw_emos_boosting, quantile_preds_rw_gbm = RollingWindowQuantileCalculatorAllModels(
+        quantile_preds_rw_qrf, quantile_preds_rw_emos, quantile_preds_rw_emos_boosting = RollingWindowQuantileCalculatorAllModels(
             weather_data, len_rw_individual_preds, index_drop_na = True, ind_wind = True)
     else:
-        quantile_preds_rw_qrf, quantile_preds_rw_emos, quantile_preds_rw_emos_boosting, quantile_preds_rw_gbm = RollingWindowQuantileCalculatorAllModels(
+        quantile_preds_rw_qrf, quantile_preds_rw_emos, quantile_preds_rw_emos_boosting = RollingWindowQuantileCalculatorAllModels(
             weather_data, len_rw_individual_preds, index_drop_na = True, ind_wind = False)
     ind = 0
     for h in horizon:
@@ -370,9 +383,9 @@ def QRAFitterAndEvaluator(weather_data, len_rw_individual_preds, len_rw_qra_mode
         quantile_preds_rw_emos_boosting_h = quantile_preds_rw_emos_boosting_h.reset_index()
         quantile_preds_rw_emos_boosting_h = quantile_preds_rw_emos_boosting_h.drop(columns='index')
 
-        quantile_preds_rw_gbm_h = quantile_preds_rw_gbm[(quantile_preds_rw_gbm['horizon'] == h)]
-        quantile_preds_rw_gbm_h = quantile_preds_rw_gbm_h.reset_index()
-        quantile_preds_rw_gbm_h = quantile_preds_rw_gbm_h.drop(columns='index')
+        # quantile_preds_rw_gbm_h = quantile_preds_rw_gbm[(quantile_preds_rw_gbm['horizon'] == h)]
+        # quantile_preds_rw_gbm_h = quantile_preds_rw_gbm_h.reset_index()
+        # quantile_preds_rw_gbm_h = quantile_preds_rw_gbm_h.drop(columns='index')
 
 
         eval_data = quantile_preds_rw_qrf_h[['init_tm', 'obs_tm', 'obs', 'horizon']].iloc[
@@ -420,6 +433,112 @@ def QRAFitterAndEvaluator(weather_data, len_rw_individual_preds, len_rw_qra_mode
     eval_data_all_horizons = eval_data_all_horizons.reset_index().drop(columns = 'index')
 
     return eval_data_all_horizons
+
+def QRAFitterAndEvaluator_multiple_alphas(weather_data, len_rw_individual_preds, len_rw_qra_model, ind_wind, alphas):
+
+    if ind_wind == True:
+        quantile_preds_rw_qrf, quantile_preds_rw_emos, quantile_preds_rw_emos_boosting = RollingWindowQuantileCalculatorAllModels(
+            weather_data, len_rw_individual_preds, index_drop_na = True, ind_wind = True)
+    else:
+        quantile_preds_rw_qrf, quantile_preds_rw_emos, quantile_preds_rw_emos_boosting = RollingWindowQuantileCalculatorAllModels(
+            weather_data, len_rw_individual_preds, index_drop_na = True, ind_wind = False)
+    ind = 0
+    ind_alpha = -1
+
+    for alpha_qr in alphas:
+        ind_alpha = ind_alpha + 1
+        for h in horizon:
+
+            quantile_preds_rw_qrf_h = quantile_preds_rw_qrf[(quantile_preds_rw_qrf['horizon'] == h)]
+            quantile_preds_rw_qrf_h = quantile_preds_rw_qrf_h.reset_index()
+            quantile_preds_rw_qrf_h = quantile_preds_rw_qrf_h.drop(columns='index')
+
+            quantile_preds_rw_emos_h = quantile_preds_rw_emos[(quantile_preds_rw_emos['horizon'] == h)]
+            quantile_preds_rw_emos_h = quantile_preds_rw_emos_h.reset_index()
+            quantile_preds_rw_emos_h = quantile_preds_rw_emos_h.drop(columns='index')
+
+            quantile_preds_rw_emos_boosting_h = quantile_preds_rw_emos_boosting[(quantile_preds_rw_emos_boosting['horizon'] == h)]
+            quantile_preds_rw_emos_boosting_h = quantile_preds_rw_emos_boosting_h.reset_index()
+            quantile_preds_rw_emos_boosting_h = quantile_preds_rw_emos_boosting_h.drop(columns='index')
+
+            # quantile_preds_rw_gbm_h = quantile_preds_rw_gbm[(quantile_preds_rw_gbm['horizon'] == h)]
+            # quantile_preds_rw_gbm_h = quantile_preds_rw_gbm_h.reset_index()
+            # quantile_preds_rw_gbm_h = quantile_preds_rw_gbm_h.drop(columns='index')
+
+
+            eval_data = quantile_preds_rw_qrf_h[['init_tm', 'obs_tm', 'obs', 'horizon']].iloc[
+                        len_rw_qra_model:len(quantile_preds_rw_qrf_h)]
+            eval_data[['0.025', '0.25', '0.5', '0.75', '0.975']] = np.zeros((len(eval_data), 5))
+            eval_data = eval_data.reset_index()
+            eval_data = eval_data.drop(columns='index')
+
+
+            for i in range(0,len(quantile_preds_rw_qrf_h) - len_rw_qra_model-1):
+
+                for q in quantile_levels:
+
+                    X = pd.DataFrame(quantile_preds_rw_qrf_h[str(q)].iloc[i:i + len_rw_qra_model + 1])
+                    X = X.rename({str(q): str(q) + 'qrf' }, axis = 'columns')
+                    X[str(q) + 'emos'] = quantile_preds_rw_emos_h[str(q)].iloc[i:i + len_rw_qra_model + 1]
+                    X[str(q) + 'emos_boosting'] = quantile_preds_rw_emos_boosting_h[str(q)].iloc[i:i + len_rw_qra_model + 1]
+                    #X[str(q) + 'gbm'] = quantile_preds_rw_gbm_h[str(q)].iloc[i:i + len_rw_qra_model + 1]
+                    X_train = X.iloc[0:-1]
+                    X_test = X.tail(1)
+                    y = quantile_preds_rw_qrf_h['obs'].iloc[i:i + len_rw_qra_model + 1]
+                    y_train = y.iloc[0:-1]
+                    #X_y_train = X_train
+                    #X_y_train['obs'] = y_train
+
+                    qr = QuantileRegressor(quantile=q, alpha=alpha_qr)
+                    y_pred = qr.fit(X_train, y_train).predict(X_test)
+                    #todo: falls das nicht besser wird vllt q's in X weglassen und nochmal probieren ob es an . lag in namen
+                    # qr = smf.quantreg("obs ~ " + str(q) + 'qrf + ' + str(q) + 'emos + ' + str(q) + 'emos_boosting', X_y_train)
+                    # res = qr.fit(q=q)
+                    # y_pred = res.predict(X_test)
+
+                    eval_data[str(q)].iloc[i] = y_pred
+
+            if ind == 0:
+                eval_data_all_horizons = eval_data
+                ind = 1
+            else:
+                eval_data_all_horizons = eval_data_all_horizons.append(eval_data)
+
+        if ind_alpha == 0:
+            eval_data_all_horizons_005 = eval_data_all_horizons
+        elif ind_alpha == 1:
+            eval_data_all_horizons_01 = eval_data_all_horizons
+        elif ind_alpha == 2:
+            eval_data_all_horizons_015 = eval_data_all_horizons
+        elif ind_alpha == 3:
+            eval_data_all_horizons_02 = eval_data_all_horizons
+
+    # prevent quantile crossing
+    eval_data_all_horizons_005[['0.025', '0.25', '0.5', '0.75', '0.975']] = eval_data_all_horizons_005[
+        ['0.025', '0.25', '0.5', '0.75', '0.975']].apply(lambda x: np.sort(x), axis=1, raw=True)
+
+    eval_data_all_horizons_005 = eval_data_all_horizons_005.dropna()
+    eval_data_all_horizons_005 = eval_data_all_horizons_005.reset_index().drop(columns = 'index')
+
+    eval_data_all_horizons_01[['0.025', '0.25', '0.5', '0.75', '0.975']] = eval_data_all_horizons_01[
+        ['0.025', '0.25', '0.5', '0.75', '0.975']].apply(lambda x: np.sort(x), axis=1, raw=True)
+
+    eval_data_all_horizons_01 = eval_data_all_horizons_01.dropna()
+    eval_data_all_horizons_01 = eval_data_all_horizons_01.reset_index().drop(columns = 'index')
+
+    eval_data_all_horizons_015[['0.025', '0.25', '0.5', '0.75', '0.975']] = eval_data_all_horizons_015[
+        ['0.025', '0.25', '0.5', '0.75', '0.975']].apply(lambda x: np.sort(x), axis=1, raw=True)
+
+    eval_data_all_horizons_015 = eval_data_all_horizons_015.dropna()
+    eval_data_all_horizons_015 = eval_data_all_horizons_015.reset_index().drop(columns = 'index')
+
+    eval_data_all_horizons_02[['0.025', '0.25', '0.5', '0.75', '0.975']] = eval_data_all_horizons_02[
+        ['0.025', '0.25', '0.5', '0.75', '0.975']].apply(lambda x: np.sort(x), axis=1, raw=True)
+
+    eval_data_all_horizons_02 = eval_data_all_horizons_02.dropna()
+    eval_data_all_horizons_02 = eval_data_all_horizons_02.reset_index().drop(columns = 'index')
+
+    return eval_data_all_horizons_005, eval_data_all_horizons_01, eval_data_all_horizons_015, eval_data_all_horizons_02
 
 def QRAQuantilePredictor(len_rw_individual_preds, weather_data, ind_wind):
 
