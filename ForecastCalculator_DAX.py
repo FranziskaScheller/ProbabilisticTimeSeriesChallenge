@@ -15,7 +15,7 @@ from itertools import permutations
 GDAXI = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/GDAXI/^GDAXI.csv')
 GDAXI = GDAXI.dropna()
 GDAXI['Date']= GDAXI['Date'].apply(lambda x: datetime.strptime(x,'%Y-%m-%d'))
-#GDAXI = GDAXI[GDAXI['Date'] >= datetime.strptime('2019-09-27', '%Y-%m-%d')].reset_index(drop=True)
+#GDAXI = GDAXI[GDAXI['Date'] >= datetime.strptime('2020-06-01', '%Y-%m-%d')].reset_index(drop=True)
 GDAXI_adj_close = GDAXI[['Date', 'Adj Close']]
 
 def ReturnComputer(y, type, diff_in_periods):
@@ -79,7 +79,7 @@ plot_acf(rets['ret_1'].values, lags=10)
 plt.title('ACF for 1d returns of DAX')
 plt.show()
 
-f = plt.figure(figsize=(6, 14))
+f = plt.figure(figsize=(6, 17))
 ax1 = f.add_subplot(511)
 rets['ret_1'].plot(ax=ax1)
 ax1.title.set_text('Time series of 1d returns')
@@ -95,10 +95,10 @@ ax4.title.set_text('Time series of 4d returns')
 ax5 = f.add_subplot(515)
 rets['ret_5'].plot(ax=ax5)
 ax5.title.set_text('Time series of 5d returns')
-plt.show()
 plt.savefig('/Users/franziska/Dropbox/DataPTSFC/Plots/raw_DAX_data_returns_different_fc_horizons.png')
+plt.show()
 
-f = plt.figure(figsize=(6, 14))
+f = plt.figure(figsize=(6, 17))
 ax1 = f.add_subplot(511)
 plot_acf(rets['ret_1'].values, lags=10, ax=ax1)
 ax1.title.set_text('ACF of 1d returns')
@@ -114,10 +114,10 @@ ax4.title.set_text('ACF of 4d returns')
 ax5 = f.add_subplot(515)
 plot_acf(rets['ret_5'].values, lags=10, ax=ax5)
 ax5.title.set_text('ACF of 5d returns')
-plt.show()
 plt.savefig('/Users/franziska/Dropbox/DataPTSFC/Plots/ACF_raw_DAX_data_returns_different_fc_horizons.png')
+plt.show()
 
-f = plt.figure(figsize=(6, 14))
+f = plt.figure(figsize=(6, 17))
 ax1 = f.add_subplot(511)
 plot_pacf(rets['ret_1'].values, lags=10, ax=ax1)
 ax1.title.set_text('PACF of 1d returns')
@@ -133,9 +133,8 @@ ax4.title.set_text('PACF of 4d returns')
 ax5 = f.add_subplot(515)
 plot_pacf(rets['ret_5'].values, lags=10, ax=ax5)
 ax5.title.set_text('PACF of 5d returns')
-plt.show()
 plt.savefig('/Users/franziska/Dropbox/DataPTSFC/Plots/PACF_raw_DAX_data_returns_different_fc_horizons.png')
-
+plt.show()
 
 basic_gm = arch_model(rets['ret_1'], p=1, q=1,
                       mean = 'constant', vol = 'GARCH', dist = 'normal')
@@ -157,6 +156,9 @@ def GarchFitter(data, len_train_data_in_days):
     start_date_train = data['Date'][0]
     #end_date_train = rets['Date'][len(rets)-2]
     end_date_train = start_date_train + timedelta(days=len_train_data_in_days)
+
+    end_date_train = data['Date'][730]
+    start_date_train = end_date_train - timedelta(days=len_train_data_in_days)
     n_train = len(data[data['Date'] <= end_date_train])
 
     col_names = ["mean_fcst_" + str(i) for i in range(1, 6)] + ["var_fcst_" + str(i) for i in range(1, 6)] + ['crps_' + str(i) for i in range(1,6)]
@@ -196,19 +198,18 @@ def GarchFitter(data, len_train_data_in_days):
 
     return mean_quantile_scores
 
-mat_len_train_dat = [30, 120, 182, 365, 730]
-#perm = permutations([0, 1, 2], 2)
-# list(permutations([0, 1, 2], 2))[0][0]
-mean_quantile_scores_diff_length = pd.DataFrame(np.zeros((len(mat_len_train_dat),2)), columns = ['days_train_data', 'mean_quantile_score'] )
-ind = 0
+# mat_len_train_dat = [30, 120, 182, 365, 730]
+# #perm = permutations([0, 1, 2], 2)
+# # list(permutations([0, 1, 2], 2))[0][0]
+# mean_quantile_scores_diff_length = pd.DataFrame(np.zeros((len(mat_len_train_dat),2)), columns = ['days_train_data', 'mean_quantile_score'] )
+# ind = 0
 # for days in mat_len_train_dat:
 #     mean_quantile_scores = GarchFitter(rets, days)
 #     mean_quantile_scores_diff_length['days_train_data'].iloc[ind] = days
 #     mean_quantile_scores_diff_length['mean_quantile_score'].iloc[ind] = mean_quantile_scores[mean_quantile_scores['description_type_of_mean'] == 'quantile_score_overall']['mean']
 #     ind = ind + 1
 
-#len_train_dat = mean_quantile_scores_diff_length['days_train_data'][mean_quantile_scores_diff_length['mean_quantile_score'] == mean_quantile_scores_diff_length['mean_quantile_score'].min()].values[0]
-len_train_dat = 730
+len_train_dat = 365
 """
 Findings: q0.025 and q0.975 have a worse quantile score compared to the other quantile levels -> find out why 
 (maybe because of specific time where forecasts were completely wrong and weights for these quantiles larger, or assumption of normal distribution not good)
@@ -443,6 +444,7 @@ Select p and q for ARMA and GARCH
 # avg_pinball_loss_choice_p_q[["avg_pinball_loss_" + str(i) for i in quantile_levels] + ['avg_pinball_loss_overall']] = loss
 
 avg_pinball_loss_choice_p_q_GARCH = pd.DataFrame([[3, 3, 1, 0], [3, 3, 0, 1], [3, 3, 1, 1], [3, 3, 2, 1], [3, 3, 1, 2], [3, 3, 2, 2], [3, 3, 3, 1], [3, 3, 1, 3], [3, 3, 3, 2], [3, 3, 2, 3], [3, 3, 3, 3]], columns = ['pAR', 'qMA', 'pGARCH', 'qGARCH'])
+
 avg_pinball_loss_choice_p_q_GARCH[["avg_pinball_loss_" + str(i) for i in quantile_levels] + ["avg_pinball_loss_overall"]] = np.zeros(len(quantile_levels) + 1)
 
 loss = np.zeros((len(avg_pinball_loss_choice_p_q_GARCH),6))
@@ -466,5 +468,3 @@ Evaluation of predictions with pinball loss and tests
 
 
 print(1)
-
-#sklearn.metrics.mean_pinball_loss()

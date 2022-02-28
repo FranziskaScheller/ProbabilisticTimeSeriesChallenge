@@ -81,9 +81,8 @@ def SharpnessDiagramPlotter(prediction_interval_widths_emos, prediction_interval
         fig1.text(0.06, 0.5, 'temperature difference in degree celsius', ha='center', va='center', rotation='vertical')
     elif target_variable == "wind_speed":
         fig1.text(0.06, 0.5, 'wind speed in ', ha='center', va='center', rotation='vertical')
-    plt.show()
     plt.savefig('/Users/franziska/Dropbox/DataPTSFC/Plots/' + str + target_variable + 'boxplots.png')
-
+    plt.show()
     return
 
 
@@ -118,12 +117,18 @@ def winkler_score(data, PI_LB, PI_UB, alpha):
 
 #winkler_score_var_histsim = winkler_score(data_1718.fe, PIs_var.histsim_l, PIs_var.histsim_u, 0.05)
 
-quantile_preds_rw_emos_temp = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_emos_6002022-01-09.csv')
-quantile_preds_rw_emos_boosting_temp = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_emos_boosting_6002022-01-09.csv')
-quantile_preds_rw_gbm_temp = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_gbm_6002022-01-09.csv')
-quantile_preds_rw_qrf_temp = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_qrf_6002022-01-09.csv')
+quantile_preds_rw_emos_temp = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_emos_7502022-01-11.csv')
+quantile_preds_rw_emos_boosting_temp = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_emos_boosting_7502022-01-11.csv')
+quantile_preds_rw_gbm_temp = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_gbm_7502022-01-25.csv')
+quantile_preds_rw_qrf_temp = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_qrf_7502022-01-25.csv')
 
 winkler_score_emos_36_25_75 = winkler_score(quantile_preds_rw_emos_temp[quantile_preds_rw_emos_temp['horizon'] == 36]['obs'], quantile_preds_rw_emos_temp[quantile_preds_rw_emos_temp['horizon'] == 36]['0.25'], quantile_preds_rw_emos_temp[quantile_preds_rw_emos_temp['horizon'] == 36]['0.75'], 0.5)
+
+quantile_preds_rw_emos_wind = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_emos_750_wind_2022-01-12.csv')
+quantile_preds_rw_emos_boosting_wind = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_emos_boosting_750_wind_2022-01-12.csv')
+quantile_preds_rw_gbm_wind = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_gbm_750_wind_2022-01-25.csv')
+quantile_preds_rw_qrf_wind = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_qrf_750_wind_2022-01-25.csv')
+
 
 horizons = [36, 48, 60, 72, 84]
 
@@ -134,6 +139,11 @@ prediction_interval_widths_emos, avg_widths_25_75_emos, avg_widths_025_975_emos,
 prediction_interval_widths_emos_boosting, avg_widths_25_75_emos_boosting, avg_widths_025_975_emos_boosting, avg_widths_25_75_overall_emos_boosting, avg_widths_025_975_overall_emos_boosting = PredictionIntervalWidthCalculator(quantile_preds_rw_emos_boosting_temp, horizons)
 prediction_interval_widths_gbm, avg_widths_25_75_gbm, avg_widths_025_975_gbm, avg_widths_25_75_overall_gbm, avg_widths_025_975_overall_gbm = PredictionIntervalWidthCalculator(quantile_preds_rw_gbm_temp, horizons)
 prediction_interval_widths_qrf, avg_widths_25_75_qrf, avg_widths_025_975_qrf, avg_widths_25_75_overall_qrf, avg_widths_025_975_overall_qrf = PredictionIntervalWidthCalculator(quantile_preds_rw_qrf_temp, horizons)
+
+prediction_interval_widths_emos_wind, avg_widths_25_75_emos_wind, avg_widths_025_975_emos_wind, avg_widths_25_75_overall_emos_wind, avg_widths_025_975_overall_emos_wind = PredictionIntervalWidthCalculator(quantile_preds_rw_emos_wind, horizons)
+prediction_interval_widths_emos_boosting_wind, avg_widths_25_75_emos_boosting_wind, avg_widths_025_975_emos_boosting_wind, avg_widths_25_75_overall_emos_boosting_wind, avg_widths_025_975_overall_emos_boosting_wind = PredictionIntervalWidthCalculator(quantile_preds_rw_emos_boosting_wind, horizons)
+prediction_interval_widths_gbm_wind, avg_widths_25_75_gbm_wind, avg_widths_025_975_gbm_wind, avg_widths_25_75_overall_gbm_wind, avg_widths_025_975_overall_gbm_wind = PredictionIntervalWidthCalculator(quantile_preds_rw_gbm_wind, horizons)
+prediction_interval_widths_qrf_wind, avg_widths_25_75_qrf_wind, avg_widths_025_975_qrf_wind, avg_widths_25_75_overall_qrf_wind, avg_widths_025_975_overall_qrf_wind = PredictionIntervalWidthCalculator(quantile_preds_rw_qrf_wind, horizons)
 
 avg_widths_25_75 = avg_widths_25_75_emos
 avg_widths_25_75 = avg_widths_25_75.rename(columns={'avg_width': 'avg_width_emos'})
@@ -150,9 +160,41 @@ avg_widths_025_975['avg_width_qrf'] = avg_widths_025_975_qrf['avg_width']
 avg_widths_25_75.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_widths_25_75' + '.csv', index=False)
 avg_widths_025_975.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_widths_025_975' + '.csv', index=False)
 
+avg_widths_25_75_wind = avg_widths_25_75_emos_wind
+avg_widths_25_75_wind = avg_widths_25_75_wind.rename(columns={'avg_width': 'avg_width_emos'})
+avg_widths_25_75_wind['avg_width_emos_boosting'] = avg_widths_25_75_emos_boosting_wind['avg_width']
+avg_widths_25_75_wind['avg_width_gbm'] = avg_widths_25_75_gbm_wind['avg_width']
+avg_widths_25_75_wind['avg_width_qrf'] = avg_widths_25_75_qrf_wind['avg_width']
+
+avg_widths_025_975_wind = avg_widths_025_975_emos_wind
+avg_widths_025_975_wind = avg_widths_025_975_wind.rename(columns={'avg_width': 'avg_width_emos'})
+avg_widths_025_975_wind['avg_width_emos_boosting'] = avg_widths_025_975_emos_boosting_wind['avg_width']
+avg_widths_025_975_wind['avg_width_gbm'] = avg_widths_025_975_gbm_wind['avg_width']
+avg_widths_025_975_wind['avg_width_qrf'] = avg_widths_025_975_qrf_wind['avg_width']
+
+avg_widths_25_75_wind.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_widths_25_75_wind' + '.csv', index=False)
+avg_widths_025_975_wind.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_widths_025_975_wind' + '.csv', index=False)
+
 """
 Plot prediction interval widths in sharpness diagram
 """
 SharpnessDiagramPlotter(prediction_interval_widths_emos, prediction_interval_widths_emos_boosting, prediction_interval_widths_gbm, prediction_interval_widths_qrf, 'IQR_25_75', "temperature")
 SharpnessDiagramPlotter(prediction_interval_widths_emos, prediction_interval_widths_emos_boosting, prediction_interval_widths_gbm, prediction_interval_widths_qrf, 'IQR_025_975', "temperature")
+SharpnessDiagramPlotter(prediction_interval_widths_emos_wind, prediction_interval_widths_emos_boosting_wind, prediction_interval_widths_gbm_wind, prediction_interval_widths_qrf_wind, 'IQR_25_75', "wind")
+SharpnessDiagramPlotter(prediction_interval_widths_emos_wind, prediction_interval_widths_emos_boosting_wind, prediction_interval_widths_gbm_wind, prediction_interval_widths_qrf_wind, 'IQR_025_975', "wind")
+
+plt.figure(figsize=(17, 10))
+plt.plot(quantile_preds_rw_emos_temp['obs_tm'][quantile_preds_rw_emos_temp['horizon'] == 36], quantile_preds_rw_emos_temp['0.025'][quantile_preds_rw_emos_temp['horizon'] == 36], label = '0.025')
+plt.plot(quantile_preds_rw_emos_temp['obs_tm'][quantile_preds_rw_emos_temp['horizon'] == 36], quantile_preds_rw_emos_temp['0.975'][quantile_preds_rw_emos_temp['horizon'] == 36], label = '0.975')
+plt.show()
+
+
+plt.figure(figsize=(17, 10))
+plt.plot(quantile_preds_rw_emos_temp['obs_tm'][quantile_preds_rw_emos_temp['horizon'] == 36], quantile_preds_rw_emos_temp['0.025'][quantile_preds_rw_emos_temp['horizon'] == 36], label = '0.025')
+plt.plot(quantile_preds_rw_emos_temp['obs_tm'][quantile_preds_rw_emos_temp['horizon'] == 36], quantile_preds_rw_emos_temp['0.975'][quantile_preds_rw_emos_temp['horizon'] == 36], label = '0.975')
+plt.show()
+
+#prediction_interval_widths_emos.apply(lambda x: max(0.025 * (x['obs'][x['horizon'] == 36] - x['0.025'][x['horizon'] == 36]), (0.025 - 1) * (x['obs'][x['horizon'] == 36] - x['0.025'][x['horizon'] == 36])))
+
+
 print(1)

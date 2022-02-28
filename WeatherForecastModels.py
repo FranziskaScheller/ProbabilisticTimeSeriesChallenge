@@ -442,10 +442,11 @@ def QRAFitterAndEvaluator_multiple_alphas(weather_data, len_rw_individual_preds,
     else:
         quantile_preds_rw_qrf, quantile_preds_rw_emos, quantile_preds_rw_emos_boosting = RollingWindowQuantileCalculatorAllModels(
             weather_data, len_rw_individual_preds, index_drop_na = True, ind_wind = False)
-    ind = 0
+    #ind = 0
     ind_alpha = -1
 
     for alpha_qr in alphas:
+        ind = 0
         ind_alpha = ind_alpha + 1
         for h in horizon:
 
@@ -505,15 +506,32 @@ def QRAFitterAndEvaluator_multiple_alphas(weather_data, len_rw_individual_preds,
                 eval_data_all_horizons = eval_data_all_horizons.append(eval_data)
 
         if ind_alpha == 0:
-            eval_data_all_horizons_005 = eval_data_all_horizons
+            eval_data_all_horizons_000 = eval_data_all_horizons
         elif ind_alpha == 1:
-            eval_data_all_horizons_01 = eval_data_all_horizons
+            eval_data_all_horizons_0025 = eval_data_all_horizons
         elif ind_alpha == 2:
-            eval_data_all_horizons_015 = eval_data_all_horizons
+            eval_data_all_horizons_005 = eval_data_all_horizons
         elif ind_alpha == 3:
+            eval_data_all_horizons_01 = eval_data_all_horizons
+        elif ind_alpha == 4:
+            eval_data_all_horizons_015 = eval_data_all_horizons
+        elif ind_alpha == 5:
             eval_data_all_horizons_02 = eval_data_all_horizons
 
     # prevent quantile crossing
+    eval_data_all_horizons_000[['0.025', '0.25', '0.5', '0.75', '0.975']] = eval_data_all_horizons_000[
+        ['0.025', '0.25', '0.5', '0.75', '0.975']].apply(lambda x: np.sort(x), axis=1, raw=True)
+
+    eval_data_all_horizons_000 = eval_data_all_horizons_000.dropna()
+    eval_data_all_horizons_000 = eval_data_all_horizons_000.reset_index().drop(columns = 'index')
+
+    eval_data_all_horizons_0025[['0.025', '0.25', '0.5', '0.75', '0.975']] = eval_data_all_horizons_0025[
+        ['0.025', '0.25', '0.5', '0.75', '0.975']].apply(lambda x: np.sort(x), axis=1, raw=True)
+
+    eval_data_all_horizons_0025 = eval_data_all_horizons_0025.dropna()
+    eval_data_all_horizons_0025 = eval_data_all_horizons_0025.reset_index().drop(columns = 'index')
+
+
     eval_data_all_horizons_005[['0.025', '0.25', '0.5', '0.75', '0.975']] = eval_data_all_horizons_005[
         ['0.025', '0.25', '0.5', '0.75', '0.975']].apply(lambda x: np.sort(x), axis=1, raw=True)
 
@@ -538,7 +556,7 @@ def QRAFitterAndEvaluator_multiple_alphas(weather_data, len_rw_individual_preds,
     eval_data_all_horizons_02 = eval_data_all_horizons_02.dropna()
     eval_data_all_horizons_02 = eval_data_all_horizons_02.reset_index().drop(columns = 'index')
 
-    return eval_data_all_horizons_005, eval_data_all_horizons_01, eval_data_all_horizons_015, eval_data_all_horizons_02
+    return eval_data_all_horizons_000, eval_data_all_horizons_0025, eval_data_all_horizons_005, eval_data_all_horizons_01, eval_data_all_horizons_015, eval_data_all_horizons_02
 
 def QRAQuantilePredictor(len_rw_individual_preds, weather_data, ind_wind):
 

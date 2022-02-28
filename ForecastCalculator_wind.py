@@ -9,7 +9,7 @@ from rpy2.robjects import pandas2ri
 from rpy2.robjects.conversion import localconverter
 from datetime import datetime, timedelta
 from Dataloader_weather import DataUpdaterWeather
-from WeatherForecastModels import EMOS_wind, GBM, QRF, RollingWindowQuantileCalculator, QRAFitterAndEvaluator, QRAQuantilePredictor, QuantilePredictionEvaluator
+from WeatherForecastModels import EMOS_wind, GBM, QRF, RollingWindowQuantileCalculator, QRAFitterAndEvaluator, QRAQuantilePredictor, QuantilePredictionEvaluator, QRAFitterAndEvaluator_multiple_alphas
 from scipy.stats import norm
 from sklearn.metrics import mean_pinball_loss
 
@@ -33,8 +33,8 @@ scoringRules = rpackages.importr('scoringRules')
 crch = rpackages.importr('crch')
 """ load wind data """
 #weather_data = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'))
-#weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather('2022-01-12', 'wind')
-weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'), 'wind')
+weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather('2022-02-09', 'wind')
+#weather_data, df_t_2m, df_wind_10m = DataUpdaterWeather(datetime.strftime(datetime.now(), '%Y-%m-%d'), 'wind')
 """
 First visualize real wind observations to get a feeling for the data
 """
@@ -43,13 +43,14 @@ logging.info('Starting visualization of wind data')
 df_wind_10m_plot = df_wind_10m.dropna()
 ind = 1
 for year in df_wind_10m_plot['obs_tm'].apply(lambda x: x.to_pydatetime().year).unique():
-    plt.plot(df_wind_10m_plot['obs_tm'][df_wind_10m_plot['obs_tm'].apply(lambda x: x.to_pydatetime().year) == year],
-             df_wind_10m_plot['obs'][df_wind_10m_plot['obs_tm'].apply(lambda x: x.to_pydatetime().year) == year])
+    plt.figure(figsize=(17, 10))
+    plt.plot(df_wind_10m_plot['obs_tm'][(df_wind_10m_plot['obs_tm'].apply(lambda x: x.to_pydatetime().year) == year) & (df_wind_10m_plot['fcst_hour'].isin(range(0,24)))],
+             df_wind_10m_plot['obs'][(df_wind_10m_plot['obs_tm'].apply(lambda x: x.to_pydatetime().year) == year) & (df_wind_10m_plot['fcst_hour'].isin(range(0,24)))])
     plt.xlabel('time')
     plt.ylabel('wind in km/h')
     ind = ind + 1
-    plt.show()
     plt.savefig('/Users/franziska/Dropbox/DataPTSFC/Plots/' + str(year) + 'wind_timeseries_raw_data.png')
+    plt.show()
 
 horizon = [36, 48, 60, 72, 84]
 estimated_params = pd.DataFrame(horizon, columns=['horizon'])
@@ -428,46 +429,97 @@ Grid search of parameters with rolling window evaluation
 """
 Forecast Combination by (simple) averaging 
 """
-# read rolling window predictions in
-quantile_preds_rw_emos = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_emos_750_wind_2022-01-12.csv')
-quantile_preds_rw_emos_boosting = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_emos_boosting_750_wind_2022-01-12.csv')
-quantile_preds_rw_gbm = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_gbm_750_wind_2022-01-25.csv')
-quantile_preds_rw_qrf = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_qrf_750_wind_2022-01-25.csv')
-
-# ALL MODELS
-quantile_preds_rw_avg_all_models = pd.DataFrame(quantile_preds_rw_emos[['init_tm', 'obs_tm', 'horizon', 'obs']])
-for q in quantile_levels:
-    quantile_preds_rw_avg_all_models[str(q)] = pd.concat([quantile_preds_rw_emos[str(q)],quantile_preds_rw_emos_boosting[str(q)], quantile_preds_rw_gbm[str(q)], quantile_preds_rw_qrf[str(q)]],axis=1).mean(axis = 1)
-
-avg_pinball_loss_avg_all_models, avg_pinball_loss_per_quantile_avg_all_models, avg_pinball_loss_overall_avg_all_models = QuantilePredictionEvaluator(quantile_preds_rw_avg_all_models, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
+# # read rolling window predictions in
+# quantile_preds_rw_emos = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_emos_750_wind_2022-01-12.csv')
+# quantile_preds_rw_emos_boosting = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_emos_boosting_750_wind_2022-01-12.csv')
+# quantile_preds_rw_gbm = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_gbm_750_wind_2022-01-25.csv')
+# quantile_preds_rw_qrf = pd.read_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_qrf_750_wind_2022-01-25.csv')
 #
-quantile_preds_rw_avg_all_models.to_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_avg_all_models_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-avg_pinball_loss_avg_all_models.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_avg_all_models_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-avg_pinball_loss_per_quantile_avg_all_models.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_avg_all_models_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-
-# TWO BEST MODELS; ONE PARAMETRIC ONE NON-PARAMETRIC
-quantile_preds_rw_avg_emos_qrf = pd.DataFrame(quantile_preds_rw_emos[['init_tm', 'obs_tm', 'horizon', 'obs']])
-for q in quantile_levels:
-    quantile_preds_rw_avg_emos_qrf[str(q)] = pd.concat([quantile_preds_rw_emos[str(q)], quantile_preds_rw_qrf[str(q)]],axis=1).mean(axis = 1)
-
-avg_pinball_loss_avg_emos_qrf, avg_pinball_loss_per_quantile_avg_emos_qrf, avg_pinball_loss_overall_avg_emos_qrf = QuantilePredictionEvaluator(quantile_preds_rw_avg_emos_qrf, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
+# # ALL MODELS
+# quantile_preds_rw_avg_all_models = pd.DataFrame(quantile_preds_rw_emos[['init_tm', 'obs_tm', 'horizon', 'obs']])
+# for q in quantile_levels:
+#     quantile_preds_rw_avg_all_models[str(q)] = pd.concat([quantile_preds_rw_emos[str(q)],quantile_preds_rw_emos_boosting[str(q)], quantile_preds_rw_gbm[str(q)], quantile_preds_rw_qrf[str(q)]],axis=1).mean(axis = 1)
 #
-quantile_preds_rw_avg_emos_qrf.to_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_avg_emos_qrf_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-avg_pinball_loss_avg_emos_qrf.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_avg_emos_qrf_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-avg_pinball_loss_per_quantile_avg_emos_qrf.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_avg_emos_qrf_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-
-# TWO BEST MODELS OVERALL
-quantile_preds_rw_avg_emos_emos_boosting = pd.DataFrame(quantile_preds_rw_emos[['init_tm', 'obs_tm', 'horizon', 'obs']])
-for q in quantile_levels:
-    quantile_preds_rw_avg_emos_emos_boosting[str(q)] = pd.concat([quantile_preds_rw_emos[str(q)], quantile_preds_rw_emos_boosting[str(q)]],axis=1).mean(axis = 1)
-
-avg_pinball_loss_avg_emos_emos_boosting, avg_pinball_loss_per_quantile_avg_emos_emos_boosting, avg_pinball_loss_overall_avg_emos_emos_boosting = QuantilePredictionEvaluator(quantile_preds_rw_avg_emos_emos_boosting, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
+# avg_pinball_loss_avg_all_models, avg_pinball_loss_per_quantile_avg_all_models, avg_pinball_loss_overall_avg_all_models = QuantilePredictionEvaluator(quantile_preds_rw_avg_all_models, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
+# #
+# quantile_preds_rw_avg_all_models.to_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_avg_all_models_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+# avg_pinball_loss_avg_all_models.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_avg_all_models_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+# avg_pinball_loss_per_quantile_avg_all_models.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_avg_all_models_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
 #
-quantile_preds_rw_avg_emos_emos_boosting.to_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_avg_emos_emos_boosting_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-avg_pinball_loss_avg_emos_emos_boosting.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_avg_emos_emos_boosting_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
-avg_pinball_loss_per_quantile_avg_emos_emos_boosting.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_avg_emos_emos_boosting_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+# # TWO BEST MODELS; ONE PARAMETRIC ONE NON-PARAMETRIC
+# quantile_preds_rw_avg_emos_qrf = pd.DataFrame(quantile_preds_rw_emos[['init_tm', 'obs_tm', 'horizon', 'obs']])
+# for q in quantile_levels:
+#     quantile_preds_rw_avg_emos_qrf[str(q)] = pd.concat([quantile_preds_rw_emos[str(q)], quantile_preds_rw_qrf[str(q)]],axis=1).mean(axis = 1)
+#
+# avg_pinball_loss_avg_emos_qrf, avg_pinball_loss_per_quantile_avg_emos_qrf, avg_pinball_loss_overall_avg_emos_qrf = QuantilePredictionEvaluator(quantile_preds_rw_avg_emos_qrf, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
+# #
+# quantile_preds_rw_avg_emos_qrf.to_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_avg_emos_qrf_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+# avg_pinball_loss_avg_emos_qrf.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_avg_emos_qrf_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+# avg_pinball_loss_per_quantile_avg_emos_qrf.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_avg_emos_qrf_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+#
+# # TWO BEST MODELS OVERALL
+# quantile_preds_rw_avg_emos_emos_boosting = pd.DataFrame(quantile_preds_rw_emos[['init_tm', 'obs_tm', 'horizon', 'obs']])
+# for q in quantile_levels:
+#     quantile_preds_rw_avg_emos_emos_boosting[str(q)] = pd.concat([quantile_preds_rw_emos[str(q)], quantile_preds_rw_emos_boosting[str(q)]],axis=1).mean(axis = 1)
+#
+# avg_pinball_loss_avg_emos_emos_boosting, avg_pinball_loss_per_quantile_avg_emos_emos_boosting, avg_pinball_loss_overall_avg_emos_emos_boosting = QuantilePredictionEvaluator(quantile_preds_rw_avg_emos_emos_boosting, quantile_levels=[0.025, 0.25, 0.5, 0.75, 0.975], horizons=horizon)
+# #
+# quantile_preds_rw_avg_emos_emos_boosting.to_csv('/Users/franziska/Dropbox/DataPTSFC/quantile_preds_rw_avg_emos_emos_boosting_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+# avg_pinball_loss_avg_emos_emos_boosting.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_avg_emos_emos_boosting_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+# avg_pinball_loss_per_quantile_avg_emos_emos_boosting.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_avg_emos_emos_boosting_750_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
 
 # EMOS + EMOS with boosting also here best
+
+alphas = [0, 0.025, 0.05, 0.1, 0.15, 0.2]
+avg_pinball_loss_alphas = pd.DataFrame(alphas, columns=['alpha'])
+
+eval_data_all_horizons_000, eval_data_all_horizons_0025, eval_data_all_horizons_005, eval_data_all_horizons_01, eval_data_all_horizons_015, eval_data_all_horizons_02  = QRAFitterAndEvaluator_multiple_alphas(weather_data, 700, 50, ind_wind=True, alphas = alphas)
+
+eval_data_all_horizons_000.to_csv('/Users/franziska/Dropbox/DataPTSFC/eval_data_all_horizons_qra_rw_700_50_alpha_000_wind_'+ datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+
+avg_pinball_loss_qra_000, avg_pinball_loss_per_quantile_qra_000, avg_pinball_loss_overall_qra_000 = QuantilePredictionEvaluator(eval_data_all_horizons_000, quantile_levels = [0.025, 0.25, 0.5, 0.75, 0.975], horizons = horizon)
+avg_pinball_loss_qra_000.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_qra_rw_700_50_000_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+avg_pinball_loss_per_quantile_qra_000.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_qra_rw_700_50_000_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+
+eval_data_all_horizons_0025.to_csv('/Users/franziska/Dropbox/DataPTSFC/eval_data_all_horizons_qra_rw_700_50_alpha_0025__wind_'+ datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+
+avg_pinball_loss_qra_0025, avg_pinball_loss_per_quantile_qra_0025, avg_pinball_loss_overall_qra_0025 = QuantilePredictionEvaluator(eval_data_all_horizons_0025, quantile_levels = [0.025, 0.25, 0.5, 0.75, 0.975], horizons = horizon)
+avg_pinball_loss_qra_0025.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_qra_rw_700_50_0025_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+avg_pinball_loss_per_quantile_qra_0025.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_qra_rw_700_50_0025_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+
+eval_data_all_horizons_005.to_csv('/Users/franziska/Dropbox/DataPTSFC/eval_data_all_horizons_qra_rw_700_50_alpha_005__wind_'+ datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+
+avg_pinball_loss_qra_005, avg_pinball_loss_per_quantile_qra_005, avg_pinball_loss_overall_qra_005 = QuantilePredictionEvaluator(eval_data_all_horizons_005, quantile_levels = [0.025, 0.25, 0.5, 0.75, 0.975], horizons = horizon)
+avg_pinball_loss_qra_005.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_qra_rw_700_50_005_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+avg_pinball_loss_per_quantile_qra_005.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_qra_rw_700_50_005_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+
+eval_data_all_horizons_01.to_csv('/Users/franziska/Dropbox/DataPTSFC/eval_data_all_horizons_qra_rw_700_50_alpha_01__wind_'+ datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+
+avg_pinball_loss_qra_01, avg_pinball_loss_per_quantile_qra_01, avg_pinball_loss_overall_qra_01 = QuantilePredictionEvaluator(eval_data_all_horizons_01, quantile_levels = [0.025, 0.25, 0.5, 0.75, 0.975], horizons = horizon)
+avg_pinball_loss_qra_01.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_qra_rw_700_50_01_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+avg_pinball_loss_per_quantile_qra_01.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_qra_rw_700_50_01_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+
+eval_data_all_horizons_015.to_csv('/Users/franziska/Dropbox/DataPTSFC/eval_data_all_horizons_qra_rw_700_50_alpha_015__wind_'+ datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+
+avg_pinball_loss_qra_015, avg_pinball_loss_per_quantile_qra_015, avg_pinball_loss_overall_qra_015 = QuantilePredictionEvaluator(eval_data_all_horizons_015, quantile_levels = [0.025, 0.25, 0.5, 0.75, 0.975], horizons = horizon)
+avg_pinball_loss_qra_015.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_qra_rw_700_50_015_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+avg_pinball_loss_per_quantile_qra_015.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_qra_rw_700_50_015_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+
+eval_data_all_horizons_02.to_csv('/Users/franziska/Dropbox/DataPTSFC/eval_data_all_horizons_qra_rw_700_50_alpha_02__wind_'+ datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
+
+avg_pinball_loss_qra_02, avg_pinball_loss_per_quantile_qra_02, avg_pinball_loss_overall_qra_02 = QuantilePredictionEvaluator(eval_data_all_horizons_02, quantile_levels = [0.025, 0.25, 0.5, 0.75, 0.975], horizons = horizon)
+avg_pinball_loss_qra_02.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_qra_rw_700_50_02_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+avg_pinball_loss_per_quantile_qra_02.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_qra_rw_700_50_02_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+
+avg_pinball_loss_alphas[avg_pinball_loss_alphas['alpha'] == 0]['avg_pinball_loss'] = avg_pinball_loss_overall_qra_000
+avg_pinball_loss_alphas[avg_pinball_loss_alphas['alpha'] == 0.025]['avg_pinball_loss'] = avg_pinball_loss_overall_qra_0025
+avg_pinball_loss_alphas[avg_pinball_loss_alphas['alpha'] == 0.05]['avg_pinball_loss'] = avg_pinball_loss_overall_qra_005
+avg_pinball_loss_alphas[avg_pinball_loss_alphas['alpha'] == 0.01]['avg_pinball_loss'] = avg_pinball_loss_overall_qra_01
+avg_pinball_loss_alphas[avg_pinball_loss_alphas['alpha'] == 0.15]['avg_pinball_loss'] = avg_pinball_loss_overall_qra_015
+avg_pinball_loss_alphas[avg_pinball_loss_alphas['alpha'] == 0.2]['avg_pinball_loss'] = avg_pinball_loss_overall_qra_02
+
+avg_pinball_loss_alphas.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_qra_rw_700_50_all_alphas__wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+
 
 alphas = [0, 0.05, 0.1, 0.15, 0.2]
 avg_pinball_loss_alphas = pd.DataFrame(alphas, columns=['alpha'])
@@ -481,7 +533,7 @@ for alpha in alphas:
 
     avg_pinball_loss_alphas[avg_pinball_loss_alphas['alpha'] == alpha]['avg_pinball_loss'] = avg_pinball_loss_overall_qra
 
-avg_pinball_loss_alphas.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_qra_rw_700_50_all_alphas_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d'), index=False)
+avg_pinball_loss_alphas.to_csv('/Users/franziska/Dropbox/DataPTSFC/avg_pinball_loss_per_quantile_qra_rw_700_50_all_alphas_wind_' + datetime.strftime(datetime.now(), '%Y-%m-%d') + '.csv', index=False)
 
 
 
